@@ -36,7 +36,10 @@
                 <label>API Key</label>
                 <input
                   type="password"
-                  v-model="form.llmApiKey"
+                  :value="llmApiKeyDisplay"
+                  @input="onLlmApiKeyInput"
+                  @focus="onLlmApiKeyFocus"
+                  @blur="onLlmApiKeyBlur"
                   placeholder="sk-xxx"
                   :disabled="form.llmType === 'mock'"
                 />
@@ -51,6 +54,10 @@
                 <label>自定义 API 地址（可选）</label>
                 <input v-model="form.llmBaseUrl" placeholder="留空使用默认地址" />
               </div>
+            </div>
+            <div v-if="form.llmType === 'azure'" class="form-group">
+              <label>Azure Region <span style="color:#94a3b8">(必填)</span></label>
+              <input v-model="form.llmRegion" placeholder="例如 eastasia、eastus" />
             </div>
           </div>
         </div>
@@ -76,7 +83,10 @@
                 <label>API Key</label>
                 <input
                   type="password"
-                  v-model="form.asrApiKey"
+                  :value="asrApiKeyDisplay"
+                  @input="onAsrApiKeyInput"
+                  @focus="onAsrApiKeyFocus"
+                  @blur="onAsrApiKeyBlur"
                   placeholder="sk-xxx"
                   :disabled="form.asrType === 'mock'"
                 />
@@ -85,6 +95,10 @@
             <div class="form-group">
               <label>自定义 API 地址（可选）</label>
               <input v-model="form.asrBaseUrl" placeholder="留空使用默认地址" />
+            </div>
+            <div v-if="form.asrType === 'azure'" class="form-group">
+              <label>Azure Region <span style="color:#94a3b8">(必填)</span></label>
+              <input v-model="form.asrRegion" placeholder="例如 eastasia、eastus" />
             </div>
           </div>
         </div>
@@ -110,7 +124,10 @@
                 <label>API Key</label>
                 <input
                   type="password"
-                  v-model="form.ttsApiKey"
+                  :value="ttsApiKeyDisplay"
+                  @input="onTtsApiKeyInput"
+                  @focus="onTtsApiKeyFocus"
+                  @blur="onTtsApiKeyBlur"
                   placeholder="sk-xxx"
                   :disabled="form.ttsType === 'mock'"
                 />
@@ -127,6 +144,10 @@
                 <label>自定义 API 地址（可选）</label>
                 <input v-model="form.ttsBaseUrl" placeholder="留空使用默认地址" />
               </div>
+            </div>
+            <div v-if="form.ttsType === 'azure'" class="form-group">
+              <label>Azure Region <span style="color:#94a3b8">(必填)</span></label>
+              <input v-model="form.ttsRegion" placeholder="例如 eastasia、eastus" />
             </div>
           </div>
         </div>
@@ -210,22 +231,91 @@ const form = reactive<UserConfigRequest>({
   llmApiKey: '',
   llmBaseUrl: '',
   llmModel: 'deepseek-chat',
+  llmRegion: '',
   asrType: 'mock',
   asrApiKey: '',
   asrBaseUrl: '',
+  asrRegion: '',
   ttsType: 'mock',
   ttsApiKey: '',
   ttsBaseUrl: '',
   ttsVoice: 'alloy',
+  ttsRegion: '',
 });
 
 const isSaving = ref(false);
 const message = ref('');
 const messageType = ref<'success' | 'error'>('success');
 
-const hasLlmConfig = computed(() => form.llmType !== 'mock' && !!form.llmApiKey);
-const hasAsrConfig = computed(() => form.asrType !== 'mock' && !!form.asrApiKey);
-const hasTtsConfig = computed(() => form.ttsType !== 'mock' && !!form.ttsApiKey);
+/** 脱敏占位符；用于标识"已配置但用户未修改"的状态。 */
+const MASK_PLACEHOLDER = '*********************';
+
+/** 后端不返回 apiKey，只有 configured 布尔值。用标记位控制输入框脱敏。 */
+const llmKeyConfigured = ref(false);
+const asrKeyConfigured = ref(false);
+const ttsKeyConfigured = ref(false);
+
+/** 用户是否主动清除了 Key（focus 后 key 清空，表示想重新输入）。 */
+const llmEditing = ref(false);
+const asrEditing = ref(false);
+const ttsEditing = ref(false);
+
+// ---- 视图显示 ----
+
+const llmApiKeyDisplay = computed(() => {
+  if (llmEditing.value) return form.llmApiKey;
+  if (llmKeyConfigured.value && !form.llmApiKey) return MASK_PLACEHOLDER;
+  return form.llmApiKey;
+});
+const asrApiKeyDisplay = computed(() => {
+  if (asrEditing.value) return form.asrApiKey;
+  if (asrKeyConfigured.value && !form.asrApiKey) return MASK_PLACEHOLDER;
+  return form.asrApiKey;
+});
+const ttsApiKeyDisplay = computed(() => {
+  if (ttsEditing.value) return form.ttsApiKey;
+  if (ttsKeyConfigured.value && !form.ttsApiKey) return MASK_PLACEHOLDER;
+  return form.ttsApiKey;
+});
+
+// ---- 交互事件 ----
+
+function onLlmApiKeyInput(e: Event) {
+  form.llmApiKey = (e.target as HTMLInputElement).value;
+}
+function onLlmApiKeyFocus() {
+  llmEditing.value = true;
+  if (form.llmApiKey === MASK_PLACEHOLDER) form.llmApiKey = '';
+}
+function onLlmApiKeyBlur() {
+  llmEditing.value = false;
+}
+
+function onAsrApiKeyInput(e: Event) {
+  form.asrApiKey = (e.target as HTMLInputElement).value;
+}
+function onAsrApiKeyFocus() {
+  asrEditing.value = true;
+  if (form.asrApiKey === MASK_PLACEHOLDER) form.asrApiKey = '';
+}
+function onAsrApiKeyBlur() {
+  asrEditing.value = false;
+}
+
+function onTtsApiKeyInput(e: Event) {
+  form.ttsApiKey = (e.target as HTMLInputElement).value;
+}
+function onTtsApiKeyFocus() {
+  ttsEditing.value = true;
+  if (form.ttsApiKey === MASK_PLACEHOLDER) form.ttsApiKey = '';
+}
+function onTtsApiKeyBlur() {
+  ttsEditing.value = false;
+}
+
+const hasLlmConfig = computed(() => llmKeyConfigured.value && form.llmType !== 'mock');
+const hasAsrConfig = computed(() => asrKeyConfigured.value && form.asrType !== 'mock');
+const hasTtsConfig = computed(() => ttsKeyConfigured.value && form.ttsType !== 'mock');
 
 const llmStatusText = computed(() => hasLlmConfig.value ? `${form.llmType} · ${form.llmModel}` : '未配置');
 const asrStatusText = computed(() => hasAsrConfig.value ? form.asrType : '未配置');
@@ -234,14 +324,21 @@ const ttsStatusText = computed(() => hasTtsConfig.value ? `${form.ttsType} · ${
 onMounted(async () => {
   const config = await getUserConfig(userId.value);
   if (config) {
+    llmKeyConfigured.value = config.llmConfigured || false;
+    asrKeyConfigured.value = config.asrConfigured || false;
+    ttsKeyConfigured.value = config.ttsConfigured || false;
+
     form.llmType = config.llmType || 'mock';
     form.llmBaseUrl = config.llmBaseUrl || '';
     form.llmModel = config.llmModel || 'deepseek-chat';
+    form.llmRegion = config.llmRegion || '';
     form.asrType = config.asrType || 'mock';
     form.asrBaseUrl = config.asrBaseUrl || '';
+    form.asrRegion = config.asrRegion || '';
     form.ttsType = config.ttsType || 'mock';
     form.ttsBaseUrl = config.ttsBaseUrl || '';
     form.ttsVoice = config.ttsVoice || 'alloy';
+    form.ttsRegion = config.ttsRegion || '';
   }
 });
 
@@ -250,21 +347,48 @@ function resetForm() {
   form.llmApiKey = '';
   form.llmBaseUrl = '';
   form.llmModel = 'deepseek-chat';
+  form.llmRegion = '';
   form.asrType = 'mock';
   form.asrApiKey = '';
   form.asrBaseUrl = '';
+  form.asrRegion = '';
   form.ttsType = 'mock';
   form.ttsApiKey = '';
   form.ttsBaseUrl = '';
   form.ttsVoice = 'alloy';
+  form.ttsRegion = '';
+  llmKeyConfigured.value = false;
+  asrKeyConfigured.value = false;
+  ttsKeyConfigured.value = false;
+  llmEditing.value = false;
+  asrEditing.value = false;
+  ttsEditing.value = false;
   message.value = '';
 }
 
 async function saveSettings() {
   isSaving.value = true;
   message.value = '';
+
+  // 构建请求体：脱敏占位符替换为空串，后端保持旧 Key
+  const payload: UserConfigRequest = { ...form };
+  if (payload.llmApiKey === MASK_PLACEHOLDER) payload.llmApiKey = '';
+  if (payload.asrApiKey === MASK_PLACEHOLDER) payload.asrApiKey = '';
+  if (payload.ttsApiKey === MASK_PLACEHOLDER) payload.ttsApiKey = '';
+
   try {
-    await saveUserConfig(userId.value, form);
+    await saveUserConfig(userId.value, payload);
+
+    // 保存成功后更新标记
+    llmKeyConfigured.value = form.llmType !== 'mock' && !!(form.llmApiKey || llmKeyConfigured.value);
+    asrKeyConfigured.value = form.asrType !== 'mock' && !!(form.asrApiKey || asrKeyConfigured.value);
+    ttsKeyConfigured.value = form.ttsType !== 'mock' && !!(form.ttsApiKey || ttsKeyConfigured.value);
+
+    // 清除编辑状态，让 Key 位置回显 ****
+    llmEditing.value = false;
+    asrEditing.value = false;
+    ttsEditing.value = false;
+
     message.value = '配置保存成功！';
     messageType.value = 'success';
   } catch (error) {
@@ -280,6 +404,7 @@ async function saveSettings() {
 <style scoped>
 .settings-page {
   min-height: 100vh;
+  padding-bottom: 80px;
   background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
 }
 .settings-header {

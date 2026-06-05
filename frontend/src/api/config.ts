@@ -4,28 +4,34 @@ export interface UserConfig {
   asrType: string;
   asrConfigured: boolean;
   asrBaseUrl: string;
+  asrRegion: string;
   ttsType: string;
   ttsConfigured: boolean;
   ttsBaseUrl: string;
   ttsVoice: string;
+  ttsRegion: string;
   llmType: string;
   llmConfigured: boolean;
   llmBaseUrl: string;
   llmModel: string;
+  llmRegion: string;
 }
 
 export interface UserConfigRequest {
   asrType?: string;
   asrApiKey?: string;
   asrBaseUrl?: string;
+  asrRegion?: string;
   ttsType?: string;
   ttsApiKey?: string;
   ttsBaseUrl?: string;
   ttsVoice?: string;
+  ttsRegion?: string;
   llmType?: string;
   llmApiKey?: string;
   llmBaseUrl?: string;
   llmModel?: string;
+  llmRegion?: string;
 }
 
 const BASE_URL = '';
