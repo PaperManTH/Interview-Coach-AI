@@ -34,7 +34,7 @@ class WebSocketClient {
 
   constructor(config: WebSocketConfig) {
     this.userId = config.userId;
-    this.url = config.url || `ws://localhost:8080/ws/interview?userId=${config.userId}`;
+    this.url = config.url || `/ws/interview?userId=${config.userId}`;
     this.reconnectDelay = config.reconnectDelay || 5000;
     this.maxReconnectAttempts = config.maxReconnectAttempts || 5;
   }
