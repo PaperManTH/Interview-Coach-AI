@@ -22,3 +22,17 @@ rad.json
 #Test results file
 TestResults.xml
 .trae/*
+# Java
+target/
+*.class
+# IDE
+.idea/
+.vscode/
+# Node
+node_modules/
+dist/
+# logs
+logs/
+*.log
+# env
+.env
