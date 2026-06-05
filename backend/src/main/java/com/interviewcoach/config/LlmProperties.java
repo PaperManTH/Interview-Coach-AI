@@ -2,7 +2,6 @@ package com.interviewcoach.config;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.stereotype.Component;
 
 /**
  * LLM Provider 配置。
