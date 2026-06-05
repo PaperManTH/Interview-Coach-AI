@@ -15,6 +15,12 @@ const routes: RouteRecordRaw[] = [
     meta: { title: 'Interview Session' }
   },
   {
+    path: '/settings',
+    name: 'Settings',
+    component: () => import('@/pages/Settings.vue'),
+    meta: { title: 'Settings' }
+  },
+  {
     path: '/:pathMatch(.*)*',
     redirect: '/'
   }
