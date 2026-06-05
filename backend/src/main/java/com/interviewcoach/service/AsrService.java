@@ -2,7 +2,8 @@ package com.interviewcoach.service;
 
 import com.interviewcoach.config.AsrProperties;
 import com.interviewcoach.config.AsrProperties.AsrProviderConfig;
-import com.interviewcoach.userconfig.UserProviderConfig;
+import com.interviewcoach.config.userconfig.UserProviderConfig;
+
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;

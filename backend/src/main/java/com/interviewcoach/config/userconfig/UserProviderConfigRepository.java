@@ -1,4 +1,4 @@
-package com.interviewcoach.userconfig;
+package com.interviewcoach.config.userconfig;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Repository;

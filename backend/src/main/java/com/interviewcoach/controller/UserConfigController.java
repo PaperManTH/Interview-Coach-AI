@@ -1,10 +1,11 @@
 package com.interviewcoach.controller;
 
+import com.interviewcoach.config.userconfig.UserProviderConfig;
 import com.interviewcoach.entity.dto.common.ApiResponse;
 import com.interviewcoach.entity.dto.userconfig.UserConfigRequest;
 import com.interviewcoach.entity.dto.userconfig.UserConfigResponse;
 import com.interviewcoach.service.UserConfigService;
-import com.interviewcoach.userconfig.UserProviderConfig;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;

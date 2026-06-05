@@ -1,7 +1,8 @@
 package com.interviewcoach.service;
 
 import com.interviewcoach.config.ChatModelConfig;
-import com.interviewcoach.userconfig.UserProviderConfig;
+import com.interviewcoach.config.userconfig.UserProviderConfig;
+
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;

@@ -1,6 +1,7 @@
 package com.interviewcoach.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.interviewcoach.config.userconfig.UserProviderConfig;
 import com.interviewcoach.entity.User;
 import com.interviewcoach.entity.dto.auth.LoginResponse;
 import com.interviewcoach.entity.dto.userconfig.UserConfigResponse;
@@ -8,7 +9,7 @@ import com.interviewcoach.exception.OAuthException;
 import com.interviewcoach.mapper.UserMapper;
 import com.interviewcoach.service.AuthService;
 import com.interviewcoach.service.UserConfigService;
-import com.interviewcoach.userconfig.UserProviderConfig;
+
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import lombok.extern.slf4j.Slf4j;
