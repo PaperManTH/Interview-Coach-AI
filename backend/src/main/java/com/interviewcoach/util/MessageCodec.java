@@ -3,7 +3,7 @@ package com.interviewcoach.util;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import com.interviewcoach.dto.websocket.MessageDTO;
+import com.interviewcoach.entity.dto.websocket.MessageDTO;
 
 import java.io.IOException;
 

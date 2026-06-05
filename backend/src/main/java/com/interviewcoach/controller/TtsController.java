@@ -1,6 +1,6 @@
 package com.interviewcoach.controller;
 
-import com.interviewcoach.dto.common.ApiResponse;
+import com.interviewcoach.entity.dto.common.ApiResponse;
 import com.interviewcoach.service.TtsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

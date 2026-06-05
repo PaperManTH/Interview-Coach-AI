@@ -3,44 +3,75 @@ package com.interviewcoach.exception;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MissingRequestHeaderException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.Map;
+import com.interviewcoach.entity.dto.common.ApiResponse;
 
 /**
- * 全局异常处理器
+ * 全局异常处理器 — 统一返回 ApiResponse 格式。
  */
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    // ==================== 业务异常 ====================
+
     @ExceptionHandler(BusinessException.class)
-    public ResponseEntity<Map<String, Object>> handleBusinessException(BusinessException e) {
+    public ResponseEntity<ApiResponse<Void>> handleBusinessException(BusinessException e) {
         log.warn("[Exception] 业务异常: code={}, message={}", e.getCode(), e.getMessage());
-        return buildResponse(HttpStatus.BAD_REQUEST, e.getCode(), e.getMessage());
+        return build(e.getStatusCode(), e.getCode(), e.getMessage());
     }
+
+    @ExceptionHandler(OAuthException.class)
+    public ResponseEntity<ApiResponse<Void>> handleOAuthException(OAuthException e) {
+        log.warn("[Exception] OAuth 异常: status={}, code={}, message={}",
+                e.getStatusCode(), e.getCode(), e.getMessage());
+        return build(e.getStatusCode(), e.getCode(), e.getMessage());
+    }
+
+    // ==================== 参数校验 ====================
 
     @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<Map<String, Object>> handleIllegalArgumentException(IllegalArgumentException e) {
-        log.warn("[Exception] 参数异常: message={}", e.getMessage());
-        return buildResponse(HttpStatus.BAD_REQUEST, "INVALID_ARGUMENT", e.getMessage());
+    public ResponseEntity<ApiResponse<Void>> handleIllegalArgument(IllegalArgumentException e) {
+        log.warn("[Exception] 参数异常: {}", e.getMessage());
+        return build(HttpStatus.BAD_REQUEST.value(), "INVALID_ARGUMENT", e.getMessage());
     }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMissingParam(MissingServletRequestParameterException e) {
+        log.warn("[Exception] 缺少必填参数: {}", e.getParameterName());
+        return build(HttpStatus.BAD_REQUEST.value(), "MISSING_PARAM",
+                "缺少必填参数: " + e.getParameterName());
+    }
+
+    @ExceptionHandler(MissingRequestHeaderException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMissingHeader(MissingRequestHeaderException e) {
+        log.warn("[Exception] 缺少必填 Header: {}", e.getHeaderName());
+        return build(HttpStatus.UNAUTHORIZED.value(), "MISSING_HEADER",
+                "缺少必填请求头: " + e.getHeaderName());
+    }
+
+    // ==================== 兜底 ====================
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<Map<String, Object>> handleException(Exception e) {
+    public ResponseEntity<ApiResponse<Void>> handleException(Exception e) {
         log.error("[Exception] 系统异常", e);
-        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "SYSTEM_ERROR", "系统内部错误");
+        return build(HttpStatus.INTERNAL_SERVER_ERROR.value(), "SYSTEM_ERROR",
+                "系统内部错误");
     }
 
-    private ResponseEntity<Map<String, Object>> buildResponse(HttpStatus status, String code, String message) {
-        Map<String, Object> body = new HashMap<>();
-        body.put("code", status.value());
-        body.put("message", message);
-        body.put("error", code);
-        body.put("timestamp", LocalDateTime.now().toString());
-        return new ResponseEntity<>(body, status);
+    // ==================== 工具方法 ====================
+
+    private ResponseEntity<ApiResponse<Void>> build(int httpStatus, String errorCode, String message) {
+        ApiResponse<Void> body = new ApiResponse<>();
+        body.setCode(httpStatus);
+        body.setMessage(message);
+        body.setData(null);
+        body.setTimestamp(System.currentTimeMillis());
+        body.setTraceId(java.util.UUID.randomUUID().toString());
+        return ResponseEntity.status(httpStatus).body(body);
     }
 }

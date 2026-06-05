@@ -1,4 +1,4 @@
-package com.interviewcoach.dto.user;
+package com.interviewcoach.entity.dto.user;
 
 import lombok.Data;
 

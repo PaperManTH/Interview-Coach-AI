@@ -22,18 +22,21 @@ public class UserProviderConfig {
     private String asrType;
     private String asrApiKey;
     private String asrBaseUrl;
+    private String asrRegion;
 
     // ===== TTS =====
     private String ttsType;
     private String ttsApiKey;
     private String ttsBaseUrl;
     private String ttsVoice;
+    private String ttsRegion;
 
     // ===== LLM =====
     private String llmType;
     private String llmApiKey;
     private String llmBaseUrl;
     private String llmModel;
+    private String llmRegion;
 
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;

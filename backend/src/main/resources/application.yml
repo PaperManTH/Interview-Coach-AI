@@ -10,10 +10,10 @@ spring:
     active: dev
   # 数据源（dev profile 覆盖具体配置）
   datasource:
-    url: jdbc:mysql://localhost:3306/interview_coach?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf8mb4&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://localhost:3306/interview_coach?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=UTF-8&allowPublicKeyRetrieval=true
     driver-class-name: com.mysql.cj.jdbc.Driver
     username: ${MYSQL_USER:root}
-    password: ${MYSQL_PASSWORD:123456}
+    password: ${MYSQL_PASSWORD:123}
 
 # MyBatis-Plus 配置
 mybatis-plus:
@@ -34,6 +34,15 @@ logging:
 
 
 app:
+  # ==== 认证 ====
+  auth:
+    # JWT 签名秘钥（生产环境通过环境变量注入）
+    jwt-secret: ${JWT_SECRET:interview-coach-jwt-secret-key-32bytes!}
+    # GitHub OAuth2
+    github:
+      client-id: ${GITHUB_CLIENT_ID:Ov23lia0zkgygySP2hjh}
+      client-secret: ${GITHUB_CLIENT_SECRET:d874d80bfd40d3640e8d2ab2559e973abff0da5d}
+
   # ---- LLM 大语言模型 ----
   llm:
     provider: ${AI_PROVIDER:mock}
@@ -45,6 +54,7 @@ app:
     azure:
       api-key: ${AZURE_OPENAI_API_KEY:}
       base-url: ${AZURE_OPENAI_ENDPOINT:}
+      region: ${AZURE_OPENAI_REGION:}
       model: gpt-4o-mini
     deepseek:
       api-key: ${DEEPSEEK_API_KEY:}

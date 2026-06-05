@@ -1,7 +1,7 @@
 package com.interviewcoach.websocket;
 
-import com.interviewcoach.dto.websocket.MessageDTO;
-import com.interviewcoach.dto.websocket.MessageType;
+import com.interviewcoach.entity.dto.websocket.MessageDTO;
+import com.interviewcoach.entity.dto.websocket.MessageType;
 import com.interviewcoach.util.MessageCodec;
 
 import jakarta.websocket.Session;

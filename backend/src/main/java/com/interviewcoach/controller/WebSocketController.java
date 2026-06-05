@@ -1,9 +1,9 @@
 package com.interviewcoach.controller;
 
-import com.interviewcoach.dto.common.ApiResponse;
-import com.interviewcoach.dto.websocket.MessageDTO;
-import com.interviewcoach.dto.websocket.MessageType;
-import com.interviewcoach.dto.websocket.SessionStatusDTO;
+import com.interviewcoach.entity.dto.common.ApiResponse;
+import com.interviewcoach.entity.dto.websocket.MessageDTO;
+import com.interviewcoach.entity.dto.websocket.MessageType;
+import com.interviewcoach.entity.dto.websocket.SessionStatusDTO;
 import com.interviewcoach.websocket.InterviewWsSession;
 import com.interviewcoach.websocket.WebSocketSessionManager;
 import lombok.RequiredArgsConstructor;

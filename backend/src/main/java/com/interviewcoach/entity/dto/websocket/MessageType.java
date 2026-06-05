@@ -1,4 +1,4 @@
-package com.interviewcoach.dto.websocket;
+package com.interviewcoach.entity.dto.websocket;
 
 /**
  * WebSocket 消息类型枚举。

@@ -1,8 +1,8 @@
 package com.interviewcoach.controller;
 
-import com.interviewcoach.dto.common.ApiResponse;
-import com.interviewcoach.dto.userconfig.UserConfigRequest;
-import com.interviewcoach.dto.userconfig.UserConfigResponse;
+import com.interviewcoach.entity.dto.common.ApiResponse;
+import com.interviewcoach.entity.dto.userconfig.UserConfigRequest;
+import com.interviewcoach.entity.dto.userconfig.UserConfigResponse;
 import com.interviewcoach.service.UserConfigService;
 import com.interviewcoach.userconfig.UserProviderConfig;
 import lombok.RequiredArgsConstructor;
@@ -37,14 +37,17 @@ public class UserConfigController {
         config.setAsrType(request.getAsrType());
         config.setAsrApiKey(request.getAsrApiKey());
         config.setAsrBaseUrl(request.getAsrBaseUrl());
+        config.setAsrRegion(request.getAsrRegion());
         config.setTtsType(request.getTtsType());
         config.setTtsApiKey(request.getTtsApiKey());
         config.setTtsBaseUrl(request.getTtsBaseUrl());
         config.setTtsVoice(request.getTtsVoice());
+        config.setTtsRegion(request.getTtsRegion());
         config.setLlmType(request.getLlmType());
         config.setLlmApiKey(request.getLlmApiKey());
         config.setLlmBaseUrl(request.getLlmBaseUrl());
         config.setLlmModel(request.getLlmModel());
+        config.setLlmRegion(request.getLlmRegion());
 
         UserProviderConfig saved = userConfigService.saveConfig(userId, config);
         return ResponseEntity.ok(ApiResponse.ok(UserConfigResponse.fromEntity(saved)));

@@ -1,4 +1,4 @@
-package com.interviewcoach.dto.websocket;
+package com.interviewcoach.entity.dto.websocket;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

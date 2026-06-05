@@ -1,4 +1,4 @@
-package com.interviewcoach.dto.userconfig;
+package com.interviewcoach.entity.dto.userconfig;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -17,14 +17,17 @@ public class UserConfigRequest {
     private String asrType;
     private String asrApiKey;
     private String asrBaseUrl;
+    private String asrRegion;
 
     private String ttsType;
     private String ttsApiKey;
     private String ttsBaseUrl;
     private String ttsVoice;
+    private String ttsRegion;
 
     private String llmType;
     private String llmApiKey;
     private String llmBaseUrl;
     private String llmModel;
+    private String llmRegion;
 }
