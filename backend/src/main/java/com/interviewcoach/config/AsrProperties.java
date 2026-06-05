@@ -14,4 +14,22 @@ public class AsrProperties {
     private String apiKey = "";
     private String baseUrl = "";
     private int timeoutSeconds = 30;
+    
+    private IflytekConfig iflytek = new IflytekConfig();
+    private AzureConfig azure = new AzureConfig();
+    
+    @Data
+    public static class IflytekConfig {
+        private String apiKey = "";
+        private String apiSecret = "";
+        private String appId = "";
+        private String baseUrl = "";
+    }
+    
+    @Data
+    public static class AzureConfig {
+        private String apiKey = "";
+        private String region = "eastus";
+        private String baseUrl = "";
+    }
 }

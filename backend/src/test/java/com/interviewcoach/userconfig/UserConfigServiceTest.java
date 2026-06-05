@@ -3,6 +3,9 @@ package com.interviewcoach.userconfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import com.interviewcoach.service.UserConfigService;
+import com.interviewcoach.service.impl.UserConfigServiceImpl;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -16,7 +19,7 @@ class UserConfigServiceTest {
     @BeforeEach
     void setUp() {
         repository = new UserProviderConfigRepository();
-        service = new UserConfigService(repository);
+        service = new UserConfigServiceImpl(repository);
     }
 
     @Test

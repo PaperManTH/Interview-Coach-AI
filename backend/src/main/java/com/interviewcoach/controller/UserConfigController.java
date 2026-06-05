@@ -3,7 +3,7 @@ package com.interviewcoach.controller;
 import com.interviewcoach.dto.common.ApiResponse;
 import com.interviewcoach.dto.userconfig.UserConfigRequest;
 import com.interviewcoach.dto.userconfig.UserConfigResponse;
-import com.interviewcoach.userconfig.UserConfigService;
+import com.interviewcoach.service.UserConfigService;
 import com.interviewcoach.userconfig.UserProviderConfig;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

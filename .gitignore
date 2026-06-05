@@ -24,7 +24,6 @@ TestResults.xml
 .trae/*
 # Java
 target/
-backend/target/
 *.class
 # IDE
 .idea/

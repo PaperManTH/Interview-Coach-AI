@@ -2,7 +2,8 @@ package com.interviewcoach.websocket;
 
 import com.interviewcoach.dto.websocket.MessageDTO;
 import com.interviewcoach.dto.websocket.MessageType;
-import com.interviewcoach.websocket.util.MessageCodec;
+import com.interviewcoach.util.MessageCodec;
+
 import jakarta.websocket.Session;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
