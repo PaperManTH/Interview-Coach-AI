@@ -1,35 +1,43 @@
 package com.interviewcoach.userconfig;
 
+import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
 
+import java.time.LocalDateTime;
+
 /**
- * 用户级 Provider 配置。
- * 存储用户自定义的 API 密钥和配置。
+ * 用户 Provider 配置实体。
+ * 对应表 user_provider_config。
  */
 @Data
+@TableName("user_provider_config")
 public class UserProviderConfig {
+
+    @TableId(type = IdType.AUTO)
+    private Long id;
 
     private String userId;
 
+    // ===== ASR =====
     private String asrType;
     private String asrApiKey;
     private String asrBaseUrl;
 
+    // ===== TTS =====
     private String ttsType;
     private String ttsApiKey;
     private String ttsBaseUrl;
     private String ttsVoice;
 
+    // ===== LLM =====
     private String llmType;
     private String llmApiKey;
     private String llmBaseUrl;
     private String llmModel;
 
-    private java.time.LocalDateTime createdAt;
-    private java.time.LocalDateTime updatedAt;
+    @TableField(fill = FieldFill.INSERT)
+    private LocalDateTime createdAt;
 
-    public UserProviderConfig() {
-        this.createdAt = java.time.LocalDateTime.now();
-        this.updatedAt = java.time.LocalDateTime.now();
-    }
+    @TableField(fill = FieldFill.INSERT_UPDATE)
+    private LocalDateTime updatedAt;
 }

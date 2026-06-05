@@ -8,6 +8,21 @@ spring:
     name: interview-coach-ai
   profiles:
     active: dev
+  # 数据源（dev profile 覆盖具体配置）
+  datasource:
+    url: jdbc:mysql://localhost:3306/interview_coach?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf8mb4&allowPublicKeyRetrieval=true
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_PASSWORD:123456}
+
+# MyBatis-Plus 配置
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+  global-config:
+    db-config:
+      id-type: auto
 
 logging:
   level:
@@ -17,12 +32,9 @@ logging:
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{traceId:-}] %-5level %logger{36} - %msg%n"
 
-# ==================== AI 配置 ====================
-# 所有 Provider 均走 OpenAI 兼容 API，切换只需改 provider 名称
+
 app:
   # ---- LLM 大语言模型 ----
-  # 国内厂商: deepseek / qwen(阿里百炼) / glm(智谱) / kimi(Moonshot)
-  # 国外厂商: openai / azure
   llm:
     provider: ${AI_PROVIDER:mock}
     # 每个 Provider 独立配置
