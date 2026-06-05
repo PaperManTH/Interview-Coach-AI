@@ -9,7 +9,7 @@ const routes: RouteRecordRaw[] = [
     meta: { title: 'Home' }
   },
   {
-    path: '/interview',
+    path: '/interview/:scene',
     name: 'Interview',
     component: () => import('@/pages/Interview.vue'),
     meta: { title: 'Interview Session' }
