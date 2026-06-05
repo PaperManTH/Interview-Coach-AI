@@ -1,0 +1,52 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+spring:
+  application:
+    name: interview-coach-ai
+  profiles:
+    active: dev
+
+logging:
+  level:
+    root: INFO
+    com.interviewcoach: DEBUG
+    org.springframework.web: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{traceId:-}] %-5level %logger{36} - %msg%n"
+
+# ---- Provider 通用配置（可扩展） ----
+app:
+  provider:
+    llm:
+      type: ${LLM_TYPE:mock}        # mock / openai / other
+      api-key: ${LLM_API_KEY:}
+      base-url: ${LLM_BASE_URL:https://api.openai.com}
+      model: ${LLM_MODEL:gpt-4o-mini}
+      timeout-seconds: 30
+    asr:
+      type: ${ASR_TYPE:mock}        # mock / whisper / other
+      api-key: ${ASR_API_KEY:}
+      base-url: ${ASR_BASE_URL:}
+      timeout-seconds: 30
+    tts:
+      type: ${TTS_TYPE:mock}        # mock / azure / elevenlabs / other
+      api-key: ${TTS_API_KEY:}
+      base-url: ${TTS_BASE_URL:}
+      voice: ${TTS_VOICE:default}
+      timeout-seconds: 30
+
+  websocket:
+    endpoint: /ws/interview
+    heartbeat-seconds: 30
+    allowed-origins: ${CORS_ORIGINS:*}
+
+  prompt:
+    # 相对于 classpath 的 prompt 目录
+    location: prompts
+
+  interview:
+    # 默认场景类型：hr / technical / pressure
+    default-type: ${INTERVIEW_TYPE:hr}
