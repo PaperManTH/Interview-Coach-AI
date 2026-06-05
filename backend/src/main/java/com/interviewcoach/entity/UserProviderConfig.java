@@ -1,4 +1,4 @@
-package com.interviewcoach.config.userconfig;
+package com.interviewcoach.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;

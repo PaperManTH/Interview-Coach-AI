@@ -81,9 +81,6 @@ app:
       api-key: ${ASR_OPENAI_API_KEY:${OPENAI_API_KEY:}}
       base-url: https://api.openai.com
       model: whisper-1
-    azure:
-      api-key: ${ASR_AZURE_KEY:}
-      region: ${ASR_AZURE_REGION:}
 
   # ---- TTS 语音合成 ----
   tts:
@@ -93,10 +90,12 @@ app:
       base-url: https://api.openai.com
       model: tts-1
       voice: alloy
-    azure:
-      api-key: ${TTS_AZURE_KEY:}
-      region: ${TTS_AZURE_REGION:}
-      voice: zh-CN-XiaoxiaoNeural
+
+  # ---- 讯飞星火 WebAPI ----
+  iflytek:
+    app-id: ${IFLYTEK_APP_ID:6497f9b2}
+    api-key: ${IFLYTEK_API_KEY:}
+    tts-voice: ${IFLYTEK_TTS_VOICE:xiaoyan}
 
   websocket:
     endpoint: /ws/interview

@@ -1,7 +1,7 @@
 package com.interviewcoach.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.interviewcoach.config.userconfig.UserProviderConfig;
+import com.interviewcoach.entity.UserProviderConfig;
 import com.interviewcoach.mapper.UserProviderConfigMapper;
 import com.interviewcoach.service.UserConfigService;
 

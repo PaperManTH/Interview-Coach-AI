@@ -1,6 +1,6 @@
 package com.interviewcoach.controller;
 
-import com.interviewcoach.config.userconfig.UserProviderConfig;
+import com.interviewcoach.entity.UserProviderConfig;
 import com.interviewcoach.entity.dto.common.ApiResponse;
 import com.interviewcoach.entity.dto.userconfig.UserConfigRequest;
 import com.interviewcoach.entity.dto.userconfig.UserConfigResponse;

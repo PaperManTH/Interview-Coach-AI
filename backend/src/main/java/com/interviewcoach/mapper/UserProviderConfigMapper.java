@@ -1,7 +1,7 @@
 package com.interviewcoach.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.interviewcoach.config.userconfig.UserProviderConfig;
+import com.interviewcoach.entity.UserProviderConfig;
 
 import org.apache.ibatis.annotations.Mapper;
 

@@ -11,7 +11,11 @@ import jakarta.websocket.*;
 import jakarta.websocket.server.ServerEndpoint;
 import lombok.extern.slf4j.Slf4j;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Base64;
 import java.util.UUID;
 
 /**
@@ -155,20 +159,68 @@ public class InterviewWsEndpoint {
     }
 
     private void handleVoiceChunk(Session session, MessageDTO msg) {
-        log.debug("[WS] 收到语音片段 sessionId={}", session.getId());
+        // 累积 Base64 编码的音频片段
+        String chunk = msg.getContent();
+        if (chunk != null && !chunk.isEmpty()) {
+            @SuppressWarnings("unchecked")
+            var buf = (java.io.ByteArrayOutputStream) session.getUserProperties().get("audioBuffer");
+            if (buf == null) {
+                buf = new java.io.ByteArrayOutputStream();
+                session.getUserProperties().put("audioBuffer", buf);
+            }
+            try {
+                byte[] decoded = Base64.getDecoder().decode(chunk);
+                buf.write(decoded);
+                log.debug("[WS] 累积音频 chunk {} bytes, total {} bytes", decoded.length, buf.size());
+            } catch (IllegalArgumentException e) {
+                log.warn("[WS] 音频 chunk Base64 解码失败: {}", e.getMessage());
+            }
+        }
     }
 
     private void handleVoiceEnd(Session session, MessageDTO msg) {
         String userId = getUserId(session);
         log.info("[WS] 结束语音输入 sessionId={}, userId={}", session.getId(), userId);
 
-        // ASR：优先用户配置 → YML 配置 → Mock
+        // 获取累积的音频数据
+        @SuppressWarnings("unchecked")
+        var buf = (java.io.ByteArrayOutputStream) session.getUserProperties().remove("audioBuffer");
+        Path audioPath = null;
+
+        if (buf != null && buf.size() > 0) {
+            try {
+                audioPath = Files.createTempFile("iflytek_asr_", ".pcm");
+                Files.write(audioPath, buf.toByteArray());
+                log.info("[WS] 音频临时文件: {} ({} bytes)", audioPath, buf.size());
+            } catch (IOException e) {
+                log.error("[WS] 写入音频临时文件失败", e);
+            }
+        }
+
+        // 如果前端直接发了完整音频（VOICE_END 携带 content）
+        if (audioPath == null && msg.getContent() != null && !msg.getContent().isEmpty()) {
+            try {
+                byte[] audioBytes = Base64.getDecoder().decode(msg.getContent());
+                audioPath = Files.createTempFile("iflytek_asr_", ".pcm");
+                Files.write(audioPath, audioBytes);
+                log.info("[WS] 音频临时文件(来自 content): {} ({} bytes)", audioPath, audioBytes.length);
+            } catch (Exception e) {
+                log.error("[WS] 写入音频临时文件失败", e);
+            }
+        }
+
         String voiceText;
-        if (asrService != null) {
+        if (audioPath != null && asrService != null) {
+            voiceText = asrService.transcribe(userId, audioPath);
+            try { Files.deleteIfExists(audioPath); } catch (IOException ignored) {}
+        } else if (asrService != null) {
+            // 回退到 Mock
             voiceText = asrService.transcribe(userId, null);
         } else {
-            voiceText = "这是语音识别结果的模拟回复";
+            voiceText = "语音识别服务未就绪";
         }
+
+        log.info("[WS] ASR 结果: {}", voiceText);
 
         String aiResponse = callAiService(userId, voiceText);
 

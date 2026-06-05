@@ -1,6 +1,6 @@
 package com.interviewcoach.entity.dto.userconfig;
 
-import com.interviewcoach.config.userconfig.UserProviderConfig;
+import com.interviewcoach.entity.UserProviderConfig;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

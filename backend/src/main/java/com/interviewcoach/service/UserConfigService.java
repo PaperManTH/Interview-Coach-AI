@@ -1,6 +1,6 @@
 package com.interviewcoach.service;
 
-import com.interviewcoach.config.userconfig.UserProviderConfig;
+import com.interviewcoach.entity.UserProviderConfig;
 
 /**
  * 用户配置服务接口

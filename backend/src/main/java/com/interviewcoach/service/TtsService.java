@@ -2,7 +2,8 @@ package com.interviewcoach.service;
 
 import com.interviewcoach.config.TtsProperties;
 import com.interviewcoach.config.TtsProperties.TtsProviderConfig;
-import com.interviewcoach.config.userconfig.UserProviderConfig;
+import com.interviewcoach.entity.UserProviderConfig;
+import com.interviewcoach.provider.IflytekTtsProvider;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,7 +38,7 @@ public class TtsService {
             .build();
 
     /**
-     * 文字转语音，返回 Base64 编码的 MP3 音频。
+     * 文字转语音，返回 Base64 编码的音频。
      * @param userId 用户ID
      * @param text 要合成的文本
      * @return Base64 音频字符串
@@ -45,15 +46,26 @@ public class TtsService {
     public String synthesize(String userId, String text) {
         UserProviderConfig userCfg = userConfigService.getConfig(userId);
         String provider = resolveProvider(userCfg);
+
+        if ("mock".equalsIgnoreCase(provider)) {
+            log.info("[TTS] Mock 模式");
+            return null;
+        }
+
+        if ("iflytek".equalsIgnoreCase(provider)) {
+            String userApiKey = userCfg != null ? userCfg.getTtsApiKey() : null;
+            return synthesizeWithIflytek(text, userApiKey);
+        }
+
         String apiKey = resolveApiKey(userCfg, provider);
+        if (isBlank(apiKey)) {
+            log.info("[TTS] Mock 模式（无 API Key）");
+            return null;
+        }
+
         String baseUrl = resolveBaseUrl(userCfg, provider);
         String voice = resolveVoice(userCfg, provider);
         String model = resolveModel(provider);
-
-        if ("mock".equalsIgnoreCase(provider) || isBlank(apiKey)) {
-            log.info("[TTS] Mock 模式");
-            return null; // null = 不需要播放语音
-        }
 
         try {
             byte[] audio = callOpenAiTts(baseUrl, apiKey, model, voice, text);
@@ -78,15 +90,33 @@ public class TtsService {
     public Path synthesizeToFile(String userId, String text, Path outputPath) throws IOException {
         UserProviderConfig userCfg = userConfigService.getConfig(userId);
         String provider = resolveProvider(userCfg);
-        String apiKey = resolveApiKey(userCfg, provider);
-        String baseUrl = resolveBaseUrl(userCfg, provider);
-        String voice = resolveVoice(userCfg, provider);
-        String model = resolveModel(provider);
 
-        if ("mock".equalsIgnoreCase(provider) || isBlank(apiKey)) {
+        if ("mock".equalsIgnoreCase(provider)) {
             log.info("[TTS] Mock 模式，跳过文件生成");
             return null;
         }
+
+        if ("iflytek".equalsIgnoreCase(provider)) {
+            String userApiKey = userCfg != null ? userCfg.getTtsApiKey() : null;
+            String base64 = synthesizeWithIflytek(text, userApiKey);
+            if (base64 != null) {
+                byte[] audio = Base64.getDecoder().decode(base64);
+                Files.write(outputPath, audio);
+                log.info("[TTS] 讯飞音频已写入: {}", outputPath);
+                return outputPath;
+            }
+            return null;
+        }
+
+        String apiKey = resolveApiKey(userCfg, provider);
+        if (isBlank(apiKey)) {
+            log.info("[TTS] Mock 模式，跳过文件生成");
+            return null;
+        }
+
+        String baseUrl = resolveBaseUrl(userCfg, provider);
+        String voice = resolveVoice(userCfg, provider);
+        String model = resolveModel(provider);
 
         try {
             byte[] audio = callOpenAiTts(baseUrl, apiKey, model, voice, text);
@@ -96,6 +126,19 @@ public class TtsService {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IOException("TTS 调用被中断", e);
+        }
+    }
+
+    // ========== 讯飞 TTS ==========
+
+    private String synthesizeWithIflytek(String text, String userApiKey) {
+        log.info("[TTS] 使用讯飞语音合成, textLen={}", text.length());
+        try {
+            IflytekTtsProvider provider = new IflytekTtsProvider(userApiKey, "xiaoyan");
+            return provider.synthesize(text);
+        } catch (Exception e) {
+            log.error("[TTS] 讯飞合成失败: {}", e.getMessage());
+            return null;
         }
     }
 
@@ -154,9 +197,6 @@ public class TtsService {
 
     /**
      * 调用 OpenAI TTS API。
-     * POST /v1/audio/speech
-     * Body: {"model":"tts-1","input":"text","voice":"alloy"}
-     * Response: MP3 bytes
      */
     private byte[] callOpenAiTts(String baseUrl, String apiKey, String model, String voice, String text)
             throws IOException, InterruptedException {

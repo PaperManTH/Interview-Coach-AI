@@ -2,7 +2,8 @@ package com.interviewcoach.service;
 
 import com.interviewcoach.config.AsrProperties;
 import com.interviewcoach.config.AsrProperties.AsrProviderConfig;
-import com.interviewcoach.config.userconfig.UserProviderConfig;
+import com.interviewcoach.entity.UserProviderConfig;
+import com.interviewcoach.provider.IflytekAsrProvider;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,12 +46,22 @@ public class AsrService {
     public String transcribe(String userId, Path audioPath) {
         UserProviderConfig userCfg = userConfigService.getConfig(userId);
         String provider = resolveProvider(userCfg);
-        String apiKey = resolveApiKey(userCfg, provider);
-        String baseUrl = resolveBaseUrl(userCfg, provider);
 
-        if ("mock".equalsIgnoreCase(provider) || isBlank(apiKey)) {
+        if ("mock".equalsIgnoreCase(provider)) {
             return mockTranscribe(audioPath);
         }
+
+        if ("iflytek".equalsIgnoreCase(provider)) {
+            String userApiKey = userCfg != null ? userCfg.getAsrApiKey() : null;
+            return transcribeWithIflytek(audioPath, userApiKey);
+        }
+
+        String apiKey = resolveApiKey(userCfg, provider);
+        if (isBlank(apiKey)) {
+            return mockTranscribe(audioPath);
+        }
+
+        String baseUrl = resolveBaseUrl(userCfg, provider);
 
         try {
             return callOpenAiWhisper(baseUrl, apiKey, audioPath);
@@ -67,6 +78,23 @@ public class AsrService {
         return transcribe(null, audioPath);
     }
 
+    // ========== 讯飞 ASR ==========
+
+    private String transcribeWithIflytek(Path audioPath, String userApiKey) {
+        log.info("[ASR] 使用讯飞听写");
+        try {
+            IflytekAsrProvider provider = new IflytekAsrProvider(userApiKey);
+            String result = provider.transcribe(audioPath);
+            if (result == null || result.isEmpty()) {
+                return "语音识别暂无结果";
+            }
+            return result;
+        } catch (Exception e) {
+            log.error("[ASR] 讯飞识别失败: {}", e.getMessage());
+            return mockTranscribe(audioPath);
+        }
+    }
+
     // ========== 内部方法 ==========
 
     private String resolveProvider(UserProviderConfig userCfg) {
@@ -77,11 +105,9 @@ public class AsrService {
     }
 
     private String resolveApiKey(UserProviderConfig userCfg, String provider) {
-        // 优先用户配置
         if (userCfg != null && !isBlank(userCfg.getAsrApiKey())) {
             return userCfg.getAsrApiKey();
         }
-        // 其次 YML 配置
         AsrProviderConfig ymlCfg = switch (provider) {
             case "openai" -> asrProperties.getOpenai();
             case "azure" -> asrProperties.getAzure();
@@ -104,13 +130,11 @@ public class AsrService {
 
     /**
      * 调用 OpenAI Whisper API。
-     * POST /v1/audio/transcriptions
      */
     private String callOpenAiWhisper(String baseUrl, String apiKey, Path audioPath) throws IOException, InterruptedException {
         String url = baseUrl.replaceAll("/$", "") + "/v1/audio/transcriptions";
         log.info("[ASR] 调用 Whisper API: {}", url);
 
-        // multipart/form-data
         String boundary = "----" + UUID.randomUUID();
         byte[] body = buildMultipartBody(boundary, audioPath);
 
@@ -168,11 +192,7 @@ public class AsrService {
         return result;
     }
 
-    /**
-     * 解析 Whisper JSON 响应：{"text": "..."}
-     */
     private String parseWhisperResponse(String json) {
-        // 简单解析，避免引入额外依赖
         int start = json.indexOf("\"text\"");
         if (start == -1) return json;
         start = json.indexOf("\"", start + 6);

@@ -1,8 +1,8 @@
 package com.interviewcoach.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.interviewcoach.config.userconfig.UserProviderConfig;
 import com.interviewcoach.entity.User;
+import com.interviewcoach.entity.UserProviderConfig;
 import com.interviewcoach.entity.dto.auth.LoginResponse;
 import com.interviewcoach.entity.dto.userconfig.UserConfigResponse;
 import com.interviewcoach.exception.OAuthException;
