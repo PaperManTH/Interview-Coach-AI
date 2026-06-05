@@ -17,26 +17,64 @@ logging:
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{traceId:-}] %-5level %logger{36} - %msg%n"
 
-# ---- Provider 通用配置（可扩展） ----
+# ==================== AI 配置 ====================
+# 所有 Provider 均走 OpenAI 兼容 API，切换只需改 provider 名称
 app:
-  provider:
-    llm:
-      type: ${LLM_TYPE:mock}        # mock / openai / other
-      api-key: ${LLM_API_KEY:}
-      base-url: ${LLM_BASE_URL:https://api.openai.com}
-      model: ${LLM_MODEL:gpt-4o-mini}
-      timeout-seconds: 30
-    asr:
-      type: ${ASR_TYPE:mock}        # mock / whisper / other
-      api-key: ${ASR_API_KEY:}
-      base-url: ${ASR_BASE_URL:}
-      timeout-seconds: 30
-    tts:
-      type: ${TTS_TYPE:mock}        # mock / azure / elevenlabs / other
-      api-key: ${TTS_API_KEY:}
-      base-url: ${TTS_BASE_URL:}
-      voice: ${TTS_VOICE:default}
-      timeout-seconds: 30
+  # ---- LLM 大语言模型 ----
+  # 国内厂商: deepseek / qwen(阿里百炼) / glm(智谱) / kimi(Moonshot)
+  # 国外厂商: openai / azure
+  llm:
+    provider: ${AI_PROVIDER:mock}
+    # 每个 Provider 独立配置
+    openai:
+      api-key: ${OPENAI_API_KEY:}
+      base-url: https://api.openai.com
+      model: gpt-4o-mini
+    azure:
+      api-key: ${AZURE_OPENAI_API_KEY:}
+      base-url: ${AZURE_OPENAI_ENDPOINT:}
+      model: gpt-4o-mini
+    deepseek:
+      api-key: ${DEEPSEEK_API_KEY:}
+      base-url: https://api.deepseek.com
+      model: deepseek-chat
+    qwen:
+      api-key: ${QWEN_API_KEY:}
+      base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
+      model: qwen-plus
+    glm:
+      api-key: ${GLM_API_KEY:}
+      base-url: https://open.bigmodel.cn/api/paas/v4
+      model: glm-4-flash
+    kimi:
+      api-key: ${KIMI_API_KEY:}
+      base-url: https://api.moonshot.cn/v1
+      model: moonshot-v1-8k
+    temperature: 0.7
+
+  # ---- ASR 语音识别 ----
+  asr:
+    provider: ${ASR_PROVIDER:mock}
+    openai:
+      api-key: ${ASR_OPENAI_API_KEY:${OPENAI_API_KEY:}}
+      base-url: https://api.openai.com
+      model: whisper-1
+    azure:
+      api-key: ${ASR_AZURE_KEY:}
+      region: ${ASR_AZURE_REGION:}
+
+  # ---- TTS 语音合成 ----
+  tts:
+    provider: ${TTS_PROVIDER:mock}
+    openai:
+      api-key: ${TTS_OPENAI_API_KEY:${OPENAI_API_KEY:}}
+      base-url: https://api.openai.com
+      model: tts-1
+      voice: alloy
+    azure:
+      api-key: ${TTS_AZURE_KEY:}
+      region: ${TTS_AZURE_REGION:}
+      voice: zh-CN-XiaoxiaoNeural
 
   websocket:
     endpoint: /ws/interview

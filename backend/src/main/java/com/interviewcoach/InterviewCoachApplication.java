@@ -6,9 +6,11 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 
 /**
  * Interview Coach AI 启动类。
- * 通过 @ConfigurationPropertiesScan 统一扫描 @ConfigurationProperties 类，
+ * 排除 OpenAI 自动配置，由 ChatModelConfig 按条件创建 ChatModel
  */
-@SpringBootApplication
+@SpringBootApplication(exclude = {
+        org.springframework.ai.autoconfigure.openai.OpenAiAutoConfiguration.class
+})
 @ConfigurationPropertiesScan("com.interviewcoach.config")
 public class InterviewCoachApplication {
 

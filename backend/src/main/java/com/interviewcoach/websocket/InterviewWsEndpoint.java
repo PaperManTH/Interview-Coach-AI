@@ -2,7 +2,9 @@ package com.interviewcoach.websocket;
 
 import com.interviewcoach.dto.websocket.MessageDTO;
 import com.interviewcoach.dto.websocket.MessageType;
+import com.interviewcoach.service.AsrService;
 import com.interviewcoach.service.SpringAiService;
+import com.interviewcoach.service.TtsService;
 import com.interviewcoach.util.MessageCodec;
 
 import jakarta.websocket.*;
@@ -24,6 +26,8 @@ public class InterviewWsEndpoint {
 
     private WebSocketSessionManager sessionManager;
     private SpringAiService springAiService;
+    private AsrService asrService;
+    private TtsService ttsService;
 
     public void setSessionManager(WebSocketSessionManager sessionManager) {
         this.sessionManager = sessionManager;
@@ -31,6 +35,14 @@ public class InterviewWsEndpoint {
 
     public void setSpringAiService(SpringAiService springAiService) {
         this.springAiService = springAiService;
+    }
+
+    public void setAsrService(AsrService asrService) {
+        this.asrService = asrService;
+    }
+
+    public void setTtsService(TtsService ttsService) {
+        this.ttsService = ttsService;
     }
 
     @OnOpen
@@ -109,10 +121,11 @@ public class InterviewWsEndpoint {
 
     private void handleTextMessage(Session session, MessageDTO msg) {
         String userMessage = msg.getContent();
+        String userId = getUserId(session);
         log.info("[WS] 收到消息 sessionId={}, content={}", session.getId(), userMessage);
-        
-        String aiResponse = callAiService(userMessage);
-        
+
+        String aiResponse = callAiService(userId, userMessage);
+
         MessageDTO reply = MessageDTO.builder()
                 .id(UUID.randomUUID().toString())
                 .type(MessageType.TEXT)
@@ -124,6 +137,9 @@ public class InterviewWsEndpoint {
                 .build();
         sendMessage(session, reply);
         sendMessage(session, MessageDTO.ack(msg.getId()));
+
+        // TTS 语音合成（异步，不阻塞回复）
+        synthesizeAndSend(session, userId, aiResponse);
     }
 
     private void handleVoiceStart(Session session, MessageDTO msg) {
@@ -143,11 +159,19 @@ public class InterviewWsEndpoint {
     }
 
     private void handleVoiceEnd(Session session, MessageDTO msg) {
-        log.info("[WS] 结束语音输入 sessionId={}", session.getId());
-        
-        String mockResult = "这是语音识别结果的模拟回复";
-        String aiResponse = callAiService(mockResult);
-        
+        String userId = getUserId(session);
+        log.info("[WS] 结束语音输入 sessionId={}, userId={}", session.getId(), userId);
+
+        // ASR：优先用户配置 → YML 配置 → Mock
+        String voiceText;
+        if (asrService != null) {
+            voiceText = asrService.transcribe(userId, null);
+        } else {
+            voiceText = "这是语音识别结果的模拟回复";
+        }
+
+        String aiResponse = callAiService(userId, voiceText);
+
         MessageDTO reply = MessageDTO.builder()
                 .id(UUID.randomUUID().toString())
                 .type(MessageType.TEXT)
@@ -157,20 +181,22 @@ public class InterviewWsEndpoint {
                 .sessionId(session.getId())
                 .build();
         sendMessage(session, reply);
+
+        // TTS
+        synthesizeAndSend(session, userId, aiResponse);
     }
 
     private void handleAck(Session session, MessageDTO msg) {
         log.debug("[WS] 收到 ACK msgId={}", msg.getId());
     }
 
-    private String callAiService(String message) {
+    private String callAiService(String userId, String message) {
         if (springAiService == null) {
             log.warn("[WS] SpringAiService 未初始化，使用模拟回复");
             return "模拟回复：" + message;
         }
-        
         try {
-            return springAiService.chat(message);
+            return springAiService.chat(userId, message);
         } catch (Exception e) {
             log.error("[WS] AI 服务调用失败", e);
             return "抱歉，服务暂时不可用";
@@ -208,6 +234,11 @@ public class InterviewWsEndpoint {
                 .build());
     }
 
+    private String getUserId(Session session) {
+        Object uid = session.getUserProperties().get(WebSocketSessionManager.KEY_USER_ID);
+        return uid != null ? uid.toString() : "anonymous";
+    }
+
     private String extractUserId(Session session, EndpointConfig config) {
         var params = session.getRequestParameterMap().get("userId");
         if (params != null && !params.isEmpty()) {
@@ -219,4 +250,29 @@ public class InterviewWsEndpoint {
         }
         return "anonymous";
     }
+
+    /**
+     * TTS 合成并发送音频消息。
+     */
+    private void synthesizeAndSend(Session session, String userId, String text) {
+        if (ttsService == null || isBlank(text)) return;
+        try {
+            String audioBase64 = ttsService.synthesize(userId, text);
+            if (audioBase64 != null) {
+                MessageDTO audioMsg = MessageDTO.builder()
+                        .id(UUID.randomUUID().toString())
+                        .type(MessageType.AUDIO)
+                        .sender("assistant")
+                        .content(audioBase64)
+                        .timestamp(System.currentTimeMillis())
+                        .sessionId(session.getId())
+                        .build();
+                sendMessage(session, audioMsg);
+            }
+        } catch (Exception e) {
+            log.warn("[WS] TTS 合成失败: {}", e.getMessage());
+        }
+    }
+
+    private static boolean isBlank(String s) { return s == null || s.isBlank(); }
 }

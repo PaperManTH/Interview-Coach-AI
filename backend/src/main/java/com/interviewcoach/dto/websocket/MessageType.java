@@ -32,5 +32,8 @@ public enum MessageType {
     VOICE_CHUNK,
 
     /** 语音分片结束（预留） */
-    VOICE_END
+    VOICE_END,
+
+    /** TTS 合成的音频（Base64编码） */
+    AUDIO
 }

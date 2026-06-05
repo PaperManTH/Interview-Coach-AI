@@ -1,6 +1,8 @@
 package com.interviewcoach.websocket;
 
+import com.interviewcoach.service.AsrService;
 import com.interviewcoach.service.SpringAiService;
+import com.interviewcoach.service.TtsService;
 import jakarta.websocket.HandshakeResponse;
 import jakarta.websocket.server.HandshakeRequest;
 import jakarta.websocket.server.ServerEndpointConfig;
@@ -49,6 +51,22 @@ public class WebSocketConfigurator extends ServerEndpointConfig.Configurator {
                     log.info("[WS] SpringAiService 注入成功");
                 } catch (Exception e) {
                     log.warn("[WS] SpringAiService 注入失败，将使用模拟模式: {}", e.getMessage());
+                }
+
+                try {
+                    AsrService asrService = getApplicationContext().getBean(AsrService.class);
+                    ws.setAsrService(asrService);
+                    log.info("[WS] AsrService 注入成功");
+                } catch (Exception e) {
+                    log.warn("[WS] AsrService 注入失败: {}", e.getMessage());
+                }
+
+                try {
+                    TtsService ttsService = getApplicationContext().getBean(TtsService.class);
+                    ws.setTtsService(ttsService);
+                    log.info("[WS] TtsService 注入成功");
+                } catch (Exception e) {
+                    log.warn("[WS] TtsService 注入失败: {}", e.getMessage());
                 }
             }
             return endpoint;

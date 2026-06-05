@@ -2,34 +2,40 @@ package com.interviewcoach.config;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.NestedConfigurationProperty;
+import org.springframework.stereotype.Component;
 
 /**
- * ASR Provider 配置。
+ * ASR 语音识别配置。
+ * LLM Key 与 ASR Key 完全独立，互不影响。
  */
 @Data
-@ConfigurationProperties(prefix = "app.provider.asr")
+@Component
+@ConfigurationProperties(prefix = "app.asr")
 public class AsrProperties {
 
-    private String type = "mock";
-    private String apiKey = "";
-    private String baseUrl = "";
-    private int timeoutSeconds = 30;
-    
-    private IflytekConfig iflytek = new IflytekConfig();
-    private AzureConfig azure = new AzureConfig();
-    
+    /** 当前 Provider：mock / openai / azure */
+    private String provider = "mock";
+
+    @NestedConfigurationProperty
+    private AsrProviderConfig openai = new AsrProviderConfig("https://api.openai.com", "whisper-1");
+
+    @NestedConfigurationProperty
+    private AsrProviderConfig azure = new AsrProviderConfig("", "");
+
     @Data
-    public static class IflytekConfig {
-        private String apiKey = "";
-        private String apiSecret = "";
-        private String appId = "";
-        private String baseUrl = "";
-    }
-    
-    @Data
-    public static class AzureConfig {
-        private String apiKey = "";
-        private String region = "eastus";
-        private String baseUrl = "";
+    public static class AsrProviderConfig {
+        private String apiKey;
+        private String baseUrl;
+        private String model;
+        /** Azure 专用：region */
+        private String region;
+
+        public AsrProviderConfig() {}
+
+        public AsrProviderConfig(String baseUrl, String model) {
+            this.baseUrl = baseUrl;
+            this.model = model;
+        }
     }
 }
