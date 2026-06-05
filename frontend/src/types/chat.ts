@@ -12,8 +12,8 @@ export interface ChatMessage {
   streaming?: boolean; // 流式输出中
 }
 
-// 会话状态：idle / listening（录音中）/ thinking（生成中）/ speaking（TTS 播放中）
-export type SessionStatus = 'idle' | 'listening' | 'thinking' | 'speaking';
+// 会话状态：idle / listening（录音中）/ thinking（生成中）/ speaking（TTS 播放中）/ processing（处理中）
+export type SessionStatus = 'idle' | 'listening' | 'thinking' | 'speaking' | 'processing';
 
 export interface InterviewSessionState {
   scene: string | null;           // hr / technical / pressure
