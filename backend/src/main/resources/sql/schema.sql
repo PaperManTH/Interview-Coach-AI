@@ -88,3 +88,16 @@ CREATE TABLE IF NOT EXISTS interview_message (
     INDEX idx_sender (sender),
     INDEX idx_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='会话消息';
+
+-- ============================================================
+-- 5. 简历解析表
+-- ============================================================
+CREATE TABLE IF NOT EXISTS resume_profile (
+    id          BIGINT       AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
+    user_id     VARCHAR(64)  NOT NULL COMMENT '用户ID',
+    resume_text LONGTEXT     DEFAULT NULL COMMENT '原始简历文本（PDF/DOCX/TXT提取）',
+    parsed_json TEXT         DEFAULT NULL COMMENT 'LLM结构化解析JSON',
+    file_name   VARCHAR(256) DEFAULT NULL COMMENT '原始文件名',
+    created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    INDEX idx_user_id (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='简历解析记录';

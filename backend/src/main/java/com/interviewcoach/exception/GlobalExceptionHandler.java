@@ -7,6 +7,8 @@ import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
 
 import com.interviewcoach.entity.dto.common.ApiResponse;
 
@@ -30,6 +32,27 @@ public class GlobalExceptionHandler {
         log.warn("[Exception] OAuth 异常: status={}, code={}, message={}",
                 e.getStatusCode(), e.getCode(), e.getMessage());
         return build(e.getStatusCode(), e.getCode(), e.getMessage());
+    }
+
+    @ExceptionHandler(FileUploadException.class)
+    public ResponseEntity<ApiResponse<Void>> handleFileUploadException(FileUploadException e) {
+        log.warn("[Exception] 文件上传异常: status={}, code={}, message={}",
+                e.getStatusCode(), e.getCode(), e.getMessage());
+        return build(e.getStatusCode(), e.getCode(), e.getMessage());
+    }
+
+    // ==================== 文件上传 ====================
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMaxUploadSize(MaxUploadSizeExceededException e) {
+        log.warn("[Exception] 文件大小超限: {}", e.getMessage());
+        return build(413, "FILE_TOO_LARGE", "文件大小超过服务器限制");
+    }
+
+    @ExceptionHandler(MultipartException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMultipartException(MultipartException e) {
+        log.warn("[Exception] 文件上传格式错误: {}", e.getMessage());
+        return build(400, "MULTIPART_ERROR", "文件上传请求格式错误");
     }
 
     // ==================== 参数校验 ====================

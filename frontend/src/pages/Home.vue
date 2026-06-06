@@ -7,44 +7,45 @@ import toolPng from '@/assets/tool_icon.png';
 import dataPng from '@/assets/data_analysis.png';
 import heroPng from '@/assets/study_process.png';
 import bgPng from '@/assets/background.png';
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { INTERVIEW_SCENES } from '@/types/scene';
 import SceneCard from '@/components/scene/SceneCard.vue';
 import { useRouter } from 'vue-router';
 import BilingualText from '@/components/BilingualText.vue';
 import { useAuthStore } from '@/stores/authStore';
 import ResumeUpload from '@/components/resume/ResumeUpload.vue';
+import type { ResumeResponse } from '@/types/resume';
 
 const router = useRouter();
 const auth = useAuthStore();
 
 const resumeUpload = ref<InstanceType<typeof ResumeUpload> | null>(null);
-const resumeInfo = ref<{ name: string; size: number } | null>(null);
+const resumeResult = ref<ResumeResponse | null>(null);
+
+const resumeName = computed(() => resumeResult.value?.fileName ?? '');
+const resumeSkills = computed(() => resumeResult.value?.parsedData?.skills ?? []);
+const hasResume = computed(() => !!resumeResult.value);
 
 onMounted(() => {
   try {
-    const raw = localStorage.getItem('icai:last-resume');
+    const raw = localStorage.getItem('icai:resume-result');
     if (raw) {
-      const data = JSON.parse(raw);
-      if (data?.name) resumeInfo.value = { name: data.name, size: data.size ?? 0 };
+      const data = JSON.parse(raw) as ResumeResponse;
+      if (data?.id) resumeResult.value = data;
     }
   } catch { /* noop */ }
 });
 
-function onResumeUploaded(payload: { name: string; size: number }) {
-  resumeInfo.value = { name: payload.name, size: payload.size };
+function onResumeUploaded(payload: { name: string; size: number; result: any }) {
+  if (payload.result) {
+    resumeResult.value = payload.result as ResumeResponse;
+  }
 }
 
 function clearResume() {
-  resumeInfo.value = null;
-  try { localStorage.removeItem('icai:last-resume'); } catch { /* noop */ }
-}
-
-function humanSize(bytes: number): string {
-  if (!bytes) return '-';
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  resumeResult.value = null;
+  resumeUpload.value?.clearResult();
+  try { localStorage.removeItem('icai:resume-result'); } catch { /* noop */ }
 }
 </script>
 
@@ -134,12 +135,17 @@ function humanSize(bytes: number): string {
             <div class="resume-sub">上传简历 · 让 AI 面试官为你量身定制问题</div>
           </div>
           <div class="resume-action">
-            <div v-if="resumeInfo" class="resume-info">
-              <span class="resume-name" :title="resumeInfo.name">{{ resumeInfo.name }}</span>
-              <span class="resume-meta">{{ humanSize(resumeInfo.size) }} · 已就绪</span>
+            <div v-if="hasResume" class="resume-info">
+              <span class="resume-name" :title="resumeName">{{ resumeName }}</span>
+              <span class="resume-meta">解析完成 · 已就绪</span>
+              <!-- 技能标签 -->
+              <div v-if="resumeSkills.length" class="resume-skills">
+                <span v-for="s in resumeSkills.slice(0, 5)" :key="s" class="skill-tiny">{{ s }}</span>
+                <span v-if="resumeSkills.length > 5" class="skill-more">+{{ resumeSkills.length - 5 }}</span>
+              </div>
               <button class="ghost-btn" @click="clearResume" title="移除">✕</button>
             </div>
-            <button v-else class="primary-btn" @click="resumeUpload?.open()">
+            <button v-else class="primary-btn" @click="resumeUpload?.quickUpload()">
               <span>选择文件</span>
               <span class="btn-zh">Choose File</span>
             </button>
@@ -338,7 +344,7 @@ function humanSize(bytes: number): string {
 }
 
 .hero-desc {
-  max-width: 640px;
+  max-width: 520px;
   margin: 0 auto;
   font-size: 16px;
   line-height: 1.65;
@@ -475,8 +481,8 @@ function humanSize(bytes: number): string {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 2px;
-  padding: 8px 10px;
+  gap: 4px;
+  padding: 10px 14px;
   background: rgba(16, 185, 129, 0.1);
   border: 1px solid rgba(16, 185, 129, 0.25);
   border-radius: 12px;
@@ -492,6 +498,32 @@ function humanSize(bytes: number): string {
   white-space: nowrap;
 }
 .resume-info .resume-meta { font-size: 11px; color: #059669; }
+.resume-skills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+  max-width: 200px;
+}
+.skill-tiny {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 500;
+}
+.skill-more {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.1);
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 500;
+}
 .ghost-btn {
   position: absolute; top: 4px; right: 4px;
   width: 18px; height: 18px;
@@ -528,7 +560,7 @@ function humanSize(bytes: number): string {
   margin: 8px auto 0;
   color: #475569;
   font-size: 14px;
-  max-width: 540px;
+  max-width: 600px;
 }
 
 .grid {
