@@ -2,12 +2,40 @@ server:
   port: 8080
   servlet:
     context-path: /
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+  tomcat:
+    websocket:
+      binary-buffer-size: 5242880
+      text-buffer-size: 5242880
 
 spring:
   application:
     name: interview-coach-ai
   profiles:
     active: dev
+  # 文件上传限制
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 12MB
+  # 数据源（dev profile 覆盖具体配置）
+  datasource:
+    url: jdbc:mysql://localhost:3306/interview_coach?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=UTF-8&allowPublicKeyRetrieval=true
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_PASSWORD:123}
+
+# MyBatis-Plus 配置
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+  global-config:
+    db-config:
+      id-type: auto
 
 logging:
   level:
@@ -17,26 +45,44 @@ logging:
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{traceId:-}] %-5level %logger{36} - %msg%n"
 
-# ---- Provider 通用配置（可扩展） ----
+
 app:
-  provider:
-    llm:
-      type: ${LLM_TYPE:mock}        # mock / openai / other
-      api-key: ${LLM_API_KEY:}
-      base-url: ${LLM_BASE_URL:https://api.openai.com}
-      model: ${LLM_MODEL:gpt-4o-mini}
-      timeout-seconds: 30
-    asr:
-      type: ${ASR_TYPE:mock}        # mock / whisper / other
-      api-key: ${ASR_API_KEY:}
-      base-url: ${ASR_BASE_URL:}
-      timeout-seconds: 30
-    tts:
-      type: ${TTS_TYPE:mock}        # mock / azure / elevenlabs / other
-      api-key: ${TTS_API_KEY:}
-      base-url: ${TTS_BASE_URL:}
-      voice: ${TTS_VOICE:default}
-      timeout-seconds: 30
+  # ==== 认证 ====
+  auth:
+    # JWT 签名秘钥（生产环境通过环境变量注入）
+    jwt-secret: ${JWT_SECRET:interview-coach-jwt-secret-key-32bytes!}
+    # GitHub OAuth2
+    github:
+      client-id: ${GITHUB_CLIENT_ID:Ov23lia0zkgygySP2hjh}
+      client-secret: ${GITHUB_CLIENT_SECRET:d874d80bfd40d3640e8d2ab2559e973abff0da5d}
+
+  # ---- HTTP 客户端 ----
+  http:
+    # 连接超时（秒）
+    connect-timeout: 10
+    # 读取超时（秒）
+    read-timeout: 30
+    # HTTP 代理
+    # 如果不需要代理，删除或注释掉 proxy 整个块
+    proxy:
+      host: 127.0.0.1
+      port: 7890
+
+  # ---- LLM 大语言模型 ----
+  # 所有LLM配置由用户在个人设置中配置，从数据库读取
+  llm:
+    provider: mock
+    temperature: 0.7
+
+  # ---- ASR 语音识别 ----
+  # 所有ASR配置由用户在个人设置中配置，从数据库读取
+  asr:
+    provider: mock
+
+  # ---- TTS 语音合成 ----
+  # 所有TTS配置由用户在个人设置中配置，从数据库读取
+  tts:
+    provider: mock
 
   websocket:
     endpoint: /ws/interview
@@ -44,7 +90,6 @@ app:
     allowed-origins: ${CORS_ORIGINS:*}
 
   prompt:
-    # 相对于 classpath 的 prompt 目录
     location: prompts
 
   interview:

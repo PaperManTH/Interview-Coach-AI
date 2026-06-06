@@ -1,11 +1,15 @@
 import { createApp } from 'vue';
 import { createPinia } from 'pinia';
 import App from './App.vue';
-import router from './router';
+import router, { injectPinia as injectPiniaToRouter } from './router';
 import './assets/styles/main.css';
 
-// 应用入口：注册 Pinia 状态管理、Vue Router，挂载到 #app
 const app = createApp(App);
-app.use(createPinia());
+const pinia = createPinia();
+app.use(pinia);
 app.use(router);
+
+// 路由守卫需要同一个 Pinia 实例
+injectPiniaToRouter(pinia);
+
 app.mount('#app');

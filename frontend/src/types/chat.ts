@@ -2,7 +2,7 @@
 // - 消息结构支持 AI 流式增量（通过 appendAiChunk 更新 content）
 // - 会话状态含 thinking / speaking，方便 UI 呈现与未来 websocket 对接
 
-export type ChatRole = 'user' | 'ai';
+export type ChatRole = 'user' | 'ai' | 'system';
 
 export interface ChatMessage {
   id: string;
@@ -10,10 +10,11 @@ export interface ChatMessage {
   content: string;
   createdAt: number;
   streaming?: boolean; // 流式输出中
+  isVoice?: boolean;   // 是否来自语音识别
 }
 
-// 会话状态：idle / listening（录音中）/ thinking（生成中）/ speaking（TTS 播放中）
-export type SessionStatus = 'idle' | 'listening' | 'thinking' | 'speaking';
+// 会话状态：idle / listening（录音中）/ thinking（生成中）/ speaking（TTS 播放中）/ processing（处理中）
+export type SessionStatus = 'idle' | 'listening' | 'thinking' | 'speaking' | 'processing';
 
 export interface InterviewSessionState {
   scene: string | null;           // hr / technical / pressure

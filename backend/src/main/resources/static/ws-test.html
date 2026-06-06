@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket 测试页面</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+            color: #333;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #2c3e50;
+        }
+        .panel {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .panel h2 {
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+            color: #3498db;
+        }
+        .row {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .col {
+            flex: 1;
+            min-width: 300px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #555;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        .btn-primary {
+            background: #3498db;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #2980b9;
+        }
+        .btn-success {
+            background: #27ae60;
+            color: white;
+        }
+        .btn-success:hover {
+            background: #219a52;
+        }
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+        .btn-warning {
+            background: #f39c12;
+            color: white;
+        }
+        .btn-warning:hover {
+            background: #d68910;
+        }
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .status {
+            padding: 10px 15px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            font-weight: 500;
+        }
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .status.connecting {
+            background: #fff3cd;
+            color: #856404;
+        }
+        #messages {
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            background: #fafafa;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+        }
+        .message {
+            padding: 8px 12px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+            border-left: 3px solid #3498db;
+            background: white;
+        }
+        .message.sent {
+            border-left-color: #27ae60;
+        }
+        .message.received {
+            border-left-color: #3498db;
+        }
+        .message.system {
+            border-left-color: #f39c12;
+            background: #fff3cd;
+        }
+        .message.error {
+            border-left-color: #e74c3c;
+            background: #f8d7da;
+        }
+        .message .time {
+            color: #999;
+            font-size: 11px;
+        }
+        .message .type {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: bold;
+            margin-left: 8px;
+            background: #eee;
+        }
+        .stats {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .stat-item {
+            background: #f8f9fa;
+            padding: 15px 20px;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .stat-item .value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #3498db;
+        }
+        .stat-item .label {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        .session-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .session-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .session-item:last-child {
+            border-bottom: none;
+        }
+        .session-item .session-id {
+            font-family: monospace;
+            font-size: 12px;
+            color: #666;
+        }
+        .session-item .online {
+            color: #27ae60;
+            font-weight: 500;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>WebSocket 测试页面</h1>
+        
+        <!-- 连接面板 -->
+        <div class="panel">
+            <h2>连接设置</h2>
+            <div class="row">
+                <div class="col">
+                    <div class="form-group">
+                        <label>WebSocket URL</label>
+                        <input type="text" id="wsUrl" value="ws://localhost:8080/ws/interview?userId=test-user-001">
+                    </div>
+                    <div class="form-group">
+                        <label>用户 ID</label>
+                        <input type="text" id="userId" value="test-user-001">
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="form-group">
+                        <label>连接状态</label>
+                        <div id="connectionStatus" class="status disconnected">未连接</div>
+                    </div>
+                    <div class="btn-group">
+                        <button id="connectBtn" class="btn-success" onclick="connect()">连接</button>
+                        <button id="disconnectBtn" class="btn-danger" onclick="disconnect()" disabled>断开</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 消息面板 -->
+        <div class="panel">
+            <h2>消息</h2>
+            <div class="row">
+                <div class="col">
+                    <div class="form-group">
+                        <label>消息类型</label>
+                        <select id="messageType">
+                            <option value="TEXT">TEXT - 文本消息</option>
+                            <option value="CHAT">CHAT - 聊天消息</option>
+                            <option value="HEARTBEAT">HEARTBEAT - 心跳</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>消息内容</label>
+                        <textarea id="messageContent" placeholder="输入消息内容...">Hello, WebSocket!</textarea>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn-primary" onclick="sendMessage()">发送消息</button>
+                        <button class="btn-warning" onclick="sendHeartbeat()">发送心跳</button>
+                        <button class="btn-danger" onclick="clearMessages()">清空消息</button>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="form-group">
+                        <label>消息日志</label>
+                        <div id="messages"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- REST API 测试面板 -->
+        <div class="panel">
+            <h2>REST API 测试</h2>
+            <div class="row">
+                <div class="col">
+                    <div class="form-group">
+                        <label>API 基础 URL</label>
+                        <input type="text" id="apiBaseUrl" value="http://localhost:8080/api/ws">
+                    </div>
+                    <div class="form-group">
+                        <label>目标会话 ID</label>
+                        <input type="text" id="targetSessionId" placeholder="输入目标会话 ID">
+                    </div>
+                    <div class="form-group">
+                        <label>目标用户 ID</label>
+                        <input type="text" id="targetUserId" placeholder="输入目标用户 ID">
+                    </div>
+                    <div class="form-group">
+                        <label>消息内容</label>
+                        <textarea id="apiMessageContent" placeholder="输入要发送的消息...">来自 REST API 的消息</textarea>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn-primary" onclick="apiSendToSession()">发送到会话</button>
+                        <button class="btn-primary" onclick="apiSendToUser()">发送到用户</button>
+                        <button class="btn-primary" onclick="apiBroadcast()">广播消息</button>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="form-group">
+                        <label>在线统计</label>
+                        <div class="stats">
+                            <div class="stat-item">
+                                <div class="value" id="onlineCount">0</div>
+                                <div class="label">在线会话</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="value" id="sentCount">0</div>
+                                <div class="label">已发送</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="value" id="receivedCount">0</div>
+                                <div class="label">已接收</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <button class="btn-primary" onclick="refreshSessions()">刷新会话列表</button>
+                    </div>
+                    <div class="session-list" id="sessionList">
+                        <!-- 会话列表将动态填充 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 使用说明 -->
+        <div class="panel">
+            <h2>使用说明</h2>
+            <div>
+                <h3>WebSocket 端点</h3>
+                <code>ws://localhost:8080/ws/interview?userId={userId}</code>
+                <h3>消息格式 (JSON)</h3>
+                <pre style="background:#f5f5f5;padding:10px;border-radius:4px;overflow-x:auto;">{
+  "id": "uuid",
+  "type": "TEXT|CHAT|HEARTBEAT|PONG|ACK|ERROR|VOICE_START|VOICE_CHUNK|VOICE_END",
+  "sender": "发送者ID",
+  "receiver": "接收者ID",
+  "content": "消息内容",
+  "timestamp": 1234567890,
+  "sessionId": "会话ID",
+  "chunkIndex": 0,
+  "totalChunks": 1,
+  "metadata": {}
+}</pre>
+                <h3>REST API</h3>
+                <ul>
+                    <li><code>POST /api/ws/send/{sessionId}</code> - 发送消息到指定会话</li>
+                    <li><code>POST /api/ws/send/user/{userId}</code> - 发送消息到指定用户的所有会话</li>
+                    <li><code>POST /api/ws/broadcast</code> - 广播消息到所有会话</li>
+                    <li><code>GET /api/ws/session/{sessionId}</code> - 查询会话状态</li>
+                    <li><code>GET /api/ws/user/{userId}/sessions</code> - 查询用户的所有会话</li>
+                    <li><code>GET /api/ws/sessions</code> - 查询所有在线会话</li>
+                    <li><code>GET /api/ws/online-count</code> - 查询在线会话数量</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let sentCount = 0;
+        let receivedCount = 0;
+
+        // 连接 WebSocket
+        function connect() {
+            const url = document.getElementById('wsUrl').value;
+            const status = document.getElementById('connectionStatus');
+            
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                addMessage('system', '已经连接，无需重复连接');
+                return;
+            }
+
+            status.textContent = '连接中...';
+            status.className = 'status connecting';
+
+            try {
+                ws = new WebSocket(url);
+                
+                ws.onopen = function() {
+                    status.textContent = '已连接';
+                    status.className = 'status connected';
+                    document.getElementById('connectBtn').disabled = true;
+                    document.getElementById('disconnectBtn').disabled = false;
+                    addMessage('system', 'WebSocket 连接成功');
+                    refreshSessions();
+                };
+
+                ws.onmessage = function(event) {
+                    receivedCount++;
+                    document.getElementById('receivedCount').textContent = receivedCount;
+                    
+                    try {
+                        const msg = JSON.parse(event.data);
+                        addMessage('received', JSON.stringify(msg, null, 2), msg.type);
+                    } catch (e) {
+                        addMessage('received', event.data);
+                    }
+                };
+
+                ws.onclose = function(event) {
+                    status.textContent = '已断开';
+                    status.className = 'status disconnected';
+                    document.getElementById('connectBtn').disabled = false;
+                    document.getElementById('disconnectBtn').disabled = true;
+                    addMessage('system', `连接关闭: code=${event.code}, reason=${event.reason}`);
+                };
+
+                ws.onerror = function(error) {
+                    status.textContent = '连接错误';
+                    status.className = 'status disconnected';
+                    addMessage('error', 'WebSocket 错误');
+                };
+            } catch (e) {
+                status.textContent = '连接失败';
+                status.className = 'status disconnected';
+                addMessage('error', '连接异常: ' + e.message);
+            }
+        }
+
+        // 断开连接
+        function disconnect() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+        }
+
+        // 发送消息
+        function sendMessage() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                addMessage('error', '未连接，请先连接');
+                return;
+            }
+
+            const type = document.getElementById('messageType').value;
+            const content = document.getElementById('messageContent').value;
+            const userId = document.getElementById('userId').value;
+
+            const msg = {
+                id: generateUUID(),
+                type: type,
+                sender: userId,
+                content: content,
+                timestamp: Date.now()
+            };
+
+            ws.send(JSON.stringify(msg));
+            sentCount++;
+            document.getElementById('sentCount').textContent = sentCount;
+            addMessage('sent', JSON.stringify(msg, null, 2), type);
+        }
+
+        // 发送心跳
+        function sendHeartbeat() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                addMessage('error', '未连接，请先连接');
+                return;
+            }
+
+            const msg = {
+                id: generateUUID(),
+                type: 'HEARTBEAT',
+                timestamp: Date.now()
+            };
+
+            ws.send(JSON.stringify(msg));
+            sentCount++;
+            document.getElementById('sentCount').textContent = sentCount;
+            addMessage('sent', JSON.stringify(msg, null, 2), 'HEARTBEAT');
+        }
+
+        // 添加消息到日志
+        function addMessage(type, content, msgType) {
+            const container = document.getElementById('messages');
+            const div = document.createElement('div');
+            div.className = `message ${type}`;
+            
+            const time = new Date().toLocaleTimeString();
+            const typeLabel = msgType ? `<span class="type">${msgType}</span>` : '';
+            
+            div.innerHTML = `
+                <div><span class="time">${time}</span>${typeLabel}</div>
+                <pre style="margin:5px 0;white-space:pre-wrap;word-break:break-all;">${escapeHtml(content)}</pre>
+            `;
+            
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // 清空消息
+        function clearMessages() {
+            document.getElementById('messages').innerHTML = '';
+        }
+
+        // REST API: 发送到会话
+        async function apiSendToSession() {
+            const sessionId = document.getElementById('targetSessionId').value;
+            if (!sessionId) {
+                alert('请输入目标会话 ID');
+                return;
+            }
+            
+            const content = document.getElementById('apiMessageContent').value;
+            const baseUrl = document.getElementById('apiBaseUrl').value;
+            
+            try {
+                const response = await fetch(`${baseUrl}/send/${sessionId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(content)
+                });
+                const result = await response.json();
+                addMessage('system', `REST API 响应: ${JSON.stringify(result)}`);
+            } catch (e) {
+                addMessage('error', `REST API 错误: ${e.message}`);
+            }
+        }
+
+        // REST API: 发送到用户
+        async function apiSendToUser() {
+            const userId = document.getElementById('targetUserId').value;
+            if (!userId) {
+                alert('请输入目标用户 ID');
+                return;
+            }
+            
+            const content = document.getElementById('apiMessageContent').value;
+            const baseUrl = document.getElementById('apiBaseUrl').value;
+            
+            try {
+                const response = await fetch(`${baseUrl}/send/user/${userId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(content)
+                });
+                const result = await response.json();
+                addMessage('system', `REST API 响应: ${JSON.stringify(result)}`);
+            } catch (e) {
+                addMessage('error', `REST API 错误: ${e.message}`);
+            }
+        }
+
+        // REST API: 广播
+        async function apiBroadcast() {
+            const content = document.getElementById('apiMessageContent').value;
+            const baseUrl = document.getElementById('apiBaseUrl').value;
+            
+            try {
+                const response = await fetch(`${baseUrl}/broadcast`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(content)
+                });
+                const result = await response.json();
+                addMessage('system', `REST API 响应: ${JSON.stringify(result)}`);
+            } catch (e) {
+                addMessage('error', `REST API 错误: ${e.message}`);
+            }
+        }
+
+        // 刷新会话列表
+        async function refreshSessions() {
+            const baseUrl = document.getElementById('apiBaseUrl').value;
+            
+            try {
+                // 获取在线数量
+                const countResponse = await fetch(`${baseUrl}/online-count`);
+                const countResult = await countResponse.json();
+                document.getElementById('onlineCount').textContent = countResult.data || 0;
+                
+                // 获取会话列表
+                const sessionsResponse = await fetch(`${baseUrl}/sessions`);
+                const sessionsResult = await sessionsResponse.json();
+                
+                const listContainer = document.getElementById('sessionList');
+                if (sessionsResult.data && sessionsResult.data.length > 0) {
+                    listContainer.innerHTML = sessionsResult.data.map(s => `
+                        <div class="session-item">
+                            <div>
+                                <div class="session-id">${s.sessionId}</div>
+                                <div style="font-size:12px;color:#999;">用户: ${s.userId}</div>
+                            </div>
+                            <div class="online">在线</div>
+                        </div>
+                    `).join('');
+                } else {
+                    listContainer.innerHTML = '<div style="padding:20px;text-align:center;color:#999;">暂无在线会话</div>';
+                }
+            } catch (e) {
+                console.error('刷新会话列表失败:', e);
+            }
+        }
+
+        // 生成 UUID
+        function generateUUID() {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                const r = Math.random() * 16 | 0;
+                const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
+
+        // HTML 转义
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // 页面加载时自动刷新会话列表
+        window.onload = function() {
+            refreshSessions();
+            // 定时刷新会话列表
+            setInterval(refreshSessions, 5000);
+        };
+    </script>
+</body>
+</html>
