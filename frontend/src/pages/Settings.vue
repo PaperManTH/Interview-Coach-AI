@@ -1,4 +1,5 @@
 <template>
+  <div class="page-wrapper" :style="{ '--bg-image': `url(${bgPng})` }">
   <div class="settings-page">
     <div class="settings-header">
       <button class="back-btn" @click="router.push('/')">
@@ -28,9 +29,7 @@
             <div class="form-row">
               <div class="form-group">
                 <label>服务提供商</label>
-                <select v-model="form.llmType">
-                  <option v-for="p in LLM_PROVIDERS" :key="p.value" :value="p.value">{{ p.label }}</option>
-                </select>
+                <CustomSelect v-model="form.llmType" :options="LLM_PROVIDERS" />
               </div>
               <div class="form-group">
                 <label>API Key</label>
@@ -75,9 +74,7 @@
             <div class="form-row">
               <div class="form-group">
                 <label>服务提供商</label>
-                <select v-model="form.asrType">
-                  <option v-for="p in ASR_PROVIDERS" :key="p.value" :value="p.value">{{ p.label }}</option>
-                </select>
+                <CustomSelect v-model="form.asrType" :options="ASR_PROVIDERS" />
               </div>
               <div class="form-group">
                 <label>API Key</label>
@@ -112,9 +109,7 @@
             <div class="form-row">
               <div class="form-group">
                 <label>服务提供商</label>
-                <select v-model="form.ttsType">
-                  <option v-for="p in TTS_PROVIDERS" :key="p.value" :value="p.value">{{ p.label }}</option>
-                </select>
+                <CustomSelect v-model="form.ttsType" :options="TTS_PROVIDERS" />
               </div>
               <div class="form-group">
                 <label>API Key</label>
@@ -132,9 +127,7 @@
             <div class="form-row">
               <div class="form-group">
                 <label>语音类型</label>
-                <select v-model="form.ttsVoice">
-                  <option v-for="v in currentTtsVoices" :key="v.value" :value="v.value">{{ v.label }}</option>
-                </select>
+                <CustomSelect v-model="form.ttsVoice" :options="currentTtsVoices" />
               </div>
               <div class="form-group">
                 <label>自定义 API 地址（可选）</label>
@@ -207,6 +200,7 @@
 
     <div v-if="message" :class="['toast', messageType]">{{ message }}</div>
   </div>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -215,11 +209,13 @@ import voicePng from '@/assets/voice_icon.png';
 import soundPng from '@/assets/tool_icon.png';
 import infoPng from '@/assets/data_analysis.png';
 import statusPng from '@/assets/study_process.png';
+import bgPng from '@/assets/background.png';
 import { ref, reactive, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/authStore';
 import { getUserConfig, saveUserConfig, type UserConfigRequest } from '../api/config';
 import { LLM_PROVIDERS, ASR_PROVIDERS, TTS_PROVIDERS, TTS_VOICES, IFLYTEK_CN_VOICES, IFLYTEK_EN_VOICES } from '@/constants';
+import CustomSelect from '@/components/ui/CustomSelect.vue';
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -408,73 +404,109 @@ async function saveSettings() {
 </script>
 
 <style scoped>
-.settings-page {
+/* ============ 全宽背景层（与 Home 一致） ============ */
+.page-wrapper {
   min-height: 100vh;
-  padding-bottom: 80px;
-  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  background: var(--bg-image) center center / cover no-repeat fixed;
+  position: relative;
 }
+.page-wrapper::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.45) 0%, rgba(15, 23, 42, 0.2) 30%, rgba(15, 23, 42, 0.35) 100%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ============ 内容容器（半透明毛玻璃） ============ */
+.settings-page {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  padding-bottom: 100px;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* ============ 顶部导航条 ============ */
 .settings-header {
   display: flex;
   align-items: center;
   gap: 20px;
-  padding: 20px 32px;
-  background: white;
-  border-bottom: 1px solid #e2e8f0;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  max-width: min(1100px, 100%);
+  margin: 0 auto;
+  padding: 20px clamp(16px, 4vw, 48px);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
 }
 .back-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 10px 16px;
-  background: #f1f5f9;
-  border: none;
-  border-radius: 8px;
+  padding: 9px 16px;
+  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 10px;
   color: #475569;
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 150ms;
+  backdrop-filter: blur(4px);
 }
-.back-btn:hover { background: #e2e8f0; color: #1e293b; }
-.header-content h1 { margin: 0; font-size: 20px; font-weight: 700; color: #1e293b; }
-.subtitle { margin: 6px 0 0; font-size: 14px; color: #64748b; }
+.back-btn:hover {
+  background: rgba(241, 245, 249, 0.8);
+  border-color: rgba(148, 163, 184, 0.5);
+  color: #1e293b;
+  transform: translateX(-2px);
+}
+.header-content h1 { margin: 0; font-size: 19px; font-weight: 700; color: #0f172a; letter-spacing: -0.01em; }
+.subtitle { margin: 4px 0 0; font-size: 13px; color: #64748b; }
 
+/* ============ 主布局网格 ============ */
 .settings-grid {
   display: grid;
-  grid-template-columns: 1fr 280px;
+  grid-template-columns: 1fr 300px;
   gap: 24px;
-  max-width: 1100px;
+  max-width: min(1100px, 100%);
   margin: 0 auto;
-  padding: 32px;
+  padding: 28px clamp(16px, 4vw, 48px) 0;
 }
 .main-section { display: flex; flex-direction: column; gap: 20px; }
 .sidebar-section { display: flex; flex-direction: column; gap: 20px; }
 
+/* ============ 卡片通用 ============ */
 .section-card {
-  background: white;
-  border-radius: 14px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-  border: 1px solid #e2e8f0;
-  overflow: hidden;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition: all 200ms cubic-bezier(0.16, 1, 0.3, 1);
 }
+.section-card:hover {
+  background: rgba(255, 255, 255, 0.62);
+  border-color: rgba(148, 163, 184, 0.3);
+}
+
 .card-header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 14px 20px;
-  border-bottom: 1px solid #f1f5f9;
-  background: #fafafa;
+  gap: 14px;
+  padding: 18px 22px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+  background: rgba(248, 250, 252, 0.5);
 }
 .card-icon {
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
-  padding: 6px;
   flex-shrink: 0;
+  padding: 8px;
   box-sizing: border-box;
 }
 .card-icon img {
@@ -483,53 +515,85 @@ async function saveSettings() {
   object-fit: contain;
   display: block;
 }
-.ai-icon { background: linear-gradient(135deg, #fef3c7, #fde68a); }
-.voice-icon { background: linear-gradient(135deg, #dbeafe, #bfdbfe); }
-.sound-icon { background: linear-gradient(135deg, #fce7f3, #fbcfe8); }
-.info-icon { background: linear-gradient(135deg, #e0e7ff, #c7d2fe); }
-.status-icon { background: linear-gradient(135deg, #dcfce7, #bbf7d0); }
-.card-title-group { display: flex; align-items: center; gap: 8px; flex: 1; }
-.card-title { font-size: 15px; font-weight: 600; color: #1e293b; }
+.ai-icon     { background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(245, 158, 11, 0.15)); }
+.voice-icon  { background: linear-gradient(135deg, rgba(59, 130, 246, 0.18), rgba(99, 102, 241, 0.12)); }
+.sound-icon  { background: linear-gradient(135deg, rgba(236, 72, 153, 0.18), rgba(217, 70, 239, 0.12)); }
+.info-icon   { background: linear-gradient(135deg, rgba(99, 102, 241, 0.18), rgba(139, 92, 246, 0.12)); }
+.status-icon { background: linear-gradient(135deg, rgba(34, 197, 94, 0.18), rgba(16, 185, 129, 0.12)); }
+
+.card-title-group { display: flex; align-items: center; gap: 10px; flex: 1; }
+.card-title { font-size: 15px; font-weight: 700; color: #0f172a; }
+
 .configured-badge {
-  padding: 2px 8px;
-  background: #dcfce7;
-  border-radius: 10px;
+  padding: 3px 10px;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 999px;
   font-size: 11px;
   font-weight: 600;
-  color: #16a34a;
+  color: #059669;
 }
-.card-body { padding: 18px 20px; }
 
-.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.card-body { padding: 20px 22px; }
+
+/* ============ 表单组件 ============ */
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.form-row + .form-row { margin-top: 14px; }
 .form-group { margin-bottom: 14px; }
 .form-group:last-child { margin-bottom: 0; }
-.form-group label { display: block; margin-bottom: 5px; font-size: 13px; font-weight: 500; color: #475569; }
-.form-group input, .form-group select {
-  width: 100%;
-  padding: 9px 12px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  font-size: 13px;
-  background: #fafafa;
-  transition: all 0.2s;
-  box-sizing: border-box;
+.form-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
-.form-group input:focus, .form-group select:focus {
-  outline: none;
-  border-color: #3b82f6;
-  background: white;
-  box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
-}
-.form-group input:disabled { background: #f1f5f9; color: #94a3b8; cursor: not-allowed; }
 
-.tips-list { display: flex; flex-direction: column; gap: 12px; }
-.tip-item { display: flex; gap: 8px; align-items: flex-start; }
+.form-group input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-family: inherit;
+  background: rgba(255, 255, 255, 0.6);
+  color: #0f172a;
+  transition: all 150ms cubic-bezier(0.16, 1, 0.3, 1);
+  box-sizing: border-box;
+  backdrop-filter: blur(4px);
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: #1e40af;
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.1);
+}
+.form-group input:disabled {
+  background: rgba(241, 245, 249, 0.5);
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+/* ============ 侧边栏 - 温馨提示 ============ */
+.tips-list { display: flex; flex-direction: column; gap: 13px; }
+.tip-item {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
 .tip-num {
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
-  background: #eff6ff;
-  color: #3b82f6;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.18), rgba(99, 102, 241, 0.1));
+  color: #1e40af;
   font-size: 11px;
   font-weight: 700;
   display: flex;
@@ -538,72 +602,123 @@ async function saveSettings() {
   flex-shrink: 0;
   margin-top: 1px;
 }
-.tip-item span:last-child { font-size: 12px; color: #475569; line-height: 1.5; }
+.tip-item span:last-child {
+  font-size: 12.5px;
+  color: #334155;
+  line-height: 1.55;
+}
 
+/* ============ 侧边栏 - 配置状态 ============ */
 .status-list { display: flex; flex-direction: column; gap: 10px; }
 .status-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 12px;
-  background: #f8fafc;
-  border-radius: 8px;
+  padding: 11px 14px;
+  background: rgba(241, 245, 249, 0.5);
+  border-radius: 10px;
+  transition: all 150ms;
 }
-.status-item.configured { background: #f0fdf4; }
-.status-label { font-size: 12px; font-weight: 500; color: #334155; }
+.status-item.configured { background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.15); }
+.status-label { font-size: 12px; font-weight: 600; color: #334155; letter-spacing: 0.03em; }
 .status-value { font-size: 12px; color: #94a3b8; }
-.status-item.configured .status-value { color: #22c55e; font-weight: 500; }
+.status-item.configured .status-value { color: #059669; font-weight: 600; }
 
+/* ============ 底部操作栏 ============ */
 .settings-footer {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 14px 32px;
-  background: white;
-  border-top: 1px solid #e2e8f0;
-  box-shadow: 0 -1px 3px rgba(0,0,0,0.04);
+  padding: 14px 0;
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-top: 1px solid rgba(148, 163, 184, 0.15);
+  z-index: 50;
 }
-.footer-content { display: flex; justify-content: flex-end; gap: 12px; max-width: 1100px; margin: 0 auto; }
+.footer-content {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  max-width: min(1100px, 100%);
+  margin: 0 auto;
+  padding: 0 clamp(16px, 4vw, 48px);
+}
 .btn {
-  padding: 11px 22px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 24px;
   border: none;
-  border-radius: 9px;
+  border-radius: 10px;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 150ms cubic-bezier(0.16, 1, 0.3, 1);
+  white-space: nowrap;
 }
-.btn-primary { background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; }
-.btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(59,130,246,0.3); }
-.btn-primary:disabled { background: #94a3b8; cursor: not-allowed; }
-.btn-secondary { background: #f1f5f9; color: #475569; }
-.btn-secondary:hover { background: #e2e8f0; }
+.btn-primary {
+  background: linear-gradient(135deg, #1e40af, #1e3a5f);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(30, 64, 175, 0.3);
+}
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(30, 64, 175, 0.4);
+}
+.btn-primary:active:not(:disabled) { transform: translateY(0); }
+.btn-primary:disabled { background: #94a3b8; cursor: not-allowed; box-shadow: none; transform: none; }
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  color: #475569;
+  backdrop-filter: blur(4px);
+}
+.btn-secondary:hover {
+  background: rgba(241, 245, 249, 0.7);
+  border-color: rgba(148, 163, 184, 0.5);
+  color: #1e293b;
+}
 
+/* ============ Toast 通知 ============ */
 .toast {
   position: fixed;
-  bottom: 80px;
+  bottom: 90px;
   left: 50%;
   transform: translateX(-50%);
-  padding: 12px 24px;
-  border-radius: 10px;
-  color: white;
+  padding: 12px 26px;
+  border-radius: 12px;
+  color: #fff;
   font-size: 14px;
-  font-weight: 500;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  font-weight: 600;
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.18);
   z-index: 1000;
+  animation: slide-up 280ms cubic-bezier(0.16, 1, 0.3, 1);
 }
-.toast.success { background: linear-gradient(135deg, #22c55e, #16a34a); }
-.toast.error { background: linear-gradient(135deg, #ef4444, #dc2626); }
+.toast.success { background: linear-gradient(135deg, #059669, #047857); }
+.toast.error   { background: linear-gradient(135deg, #dc2626, #b91c1c); }
 
+@keyframes slide-up {
+  from { opacity: 0; transform: translateX(-50%) translateY(12px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* ============ 响应式 ============ */
 @media (max-width: 900px) {
   .settings-grid { grid-template-columns: 1fr; }
   .sidebar-section { order: -1; display: grid; grid-template-columns: 1fr 1fr; }
 }
-@media (max-width: 600px) {
+
+@media (max-width: 640px) {
   .form-row { grid-template-columns: 1fr; }
   .sidebar-section { grid-template-columns: 1fr; }
-  .settings-grid { padding: 16px; }
-  .settings-header { padding: 14px 16px; }
+  .settings-header { padding: 14px 20px; }
+  .settings-grid { padding: 20px 16px 0; }
+  .back-btn { padding: 8px 12px; font-size: 12px; }
+  .header-content h1 { font-size: 17px; }
+  .card-header { padding: 14px 16px; }
+  .card-body { padding: 16px; }
+  .card-icon { width: 40px; height: 40px; padding: 6px; border-radius: 10px; }
 }
 </style>

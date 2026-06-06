@@ -51,6 +51,18 @@ app:
       client-id: ${GITHUB_CLIENT_ID:Ov23lia0zkgygySP2hjh}
       client-secret: ${GITHUB_CLIENT_SECRET:d874d80bfd40d3640e8d2ab2559e973abff0da5d}
 
+  # ---- HTTP 客户端 ----
+  http:
+    # 连接超时（秒）
+    connect-timeout: 10
+    # 读取超时（秒）
+    read-timeout: 30
+    # HTTP 代理
+    # 如果不需要代理，删除或注释掉 proxy 整个块
+    proxy:
+      host: 127.0.0.1
+      port: 7890
+
   # ---- LLM 大语言模型 ----
   # 所有LLM配置由用户在个人设置中配置，从数据库读取
   llm:
