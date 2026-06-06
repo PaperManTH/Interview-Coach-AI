@@ -1,6 +1,8 @@
 package com.interviewcoach.websocket;
 
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.socket.server.standard.ServerEndpointExporter;
@@ -13,6 +15,18 @@ import org.springframework.web.socket.server.standard.ServerEndpointExporter;
 @Slf4j
 @Configuration
 public class WebSocketConfig {
+
+    private final ApplicationContext applicationContext;
+
+    public WebSocketConfig(ApplicationContext applicationContext) {
+        this.applicationContext = applicationContext;
+    }
+
+    @PostConstruct
+    public void init() {
+        WebSocketConfigurator.setApplicationContext(applicationContext);
+        log.info("[WS] 已注入 ApplicationContext 到 WebSocketConfigurator");
+    }
 
     /**
      * 注册 ServerEndpointExporter，并显式指定要注册的端点类。

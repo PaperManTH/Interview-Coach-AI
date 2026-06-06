@@ -2,6 +2,14 @@ server:
   port: 8080
   servlet:
     context-path: /
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+  tomcat:
+    websocket:
+      binary-buffer-size: 5242880
+      text-buffer-size: 5242880
 
 spring:
   application:
@@ -44,58 +52,20 @@ app:
       client-secret: ${GITHUB_CLIENT_SECRET:d874d80bfd40d3640e8d2ab2559e973abff0da5d}
 
   # ---- LLM 大语言模型 ----
+  # 所有LLM配置由用户在个人设置中配置，从数据库读取
   llm:
-    provider: ${AI_PROVIDER:mock}
-    # 每个 Provider 独立配置
-    openai:
-      api-key: ${OPENAI_API_KEY:}
-      base-url: https://api.openai.com
-      model: gpt-4o-mini
-    azure:
-      api-key: ${AZURE_OPENAI_API_KEY:}
-      base-url: ${AZURE_OPENAI_ENDPOINT:}
-      region: ${AZURE_OPENAI_REGION:}
-      model: gpt-4o-mini
-    deepseek:
-      api-key: ${DEEPSEEK_API_KEY:}
-      base-url: https://api.deepseek.com
-      model: deepseek-chat
-    qwen:
-      api-key: ${QWEN_API_KEY:}
-      base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
-      model: qwen-plus
-    glm:
-      api-key: ${GLM_API_KEY:}
-      base-url: https://open.bigmodel.cn/api/paas/v4
-      model: glm-4-flash
-    kimi:
-      api-key: ${KIMI_API_KEY:}
-      base-url: https://api.moonshot.cn/v1
-      model: moonshot-v1-8k
+    provider: mock
     temperature: 0.7
 
   # ---- ASR 语音识别 ----
+  # 所有ASR配置由用户在个人设置中配置，从数据库读取
   asr:
-    provider: ${ASR_PROVIDER:mock}
-    openai:
-      api-key: ${ASR_OPENAI_API_KEY:${OPENAI_API_KEY:}}
-      base-url: https://api.openai.com
-      model: whisper-1
+    provider: mock
 
   # ---- TTS 语音合成 ----
+  # 所有TTS配置由用户在个人设置中配置，从数据库读取
   tts:
-    provider: ${TTS_PROVIDER:mock}
-    openai:
-      api-key: ${TTS_OPENAI_API_KEY:${OPENAI_API_KEY:}}
-      base-url: https://api.openai.com
-      model: tts-1
-      voice: alloy
-
-  # ---- 讯飞星火 WebAPI ----
-  iflytek:
-    app-id: ${IFLYTEK_APP_ID:6497f9b2}
-    api-key: ${IFLYTEK_API_KEY:}
-    tts-voice: ${IFLYTEK_TTS_VOICE:xiaoyan}
+    provider: mock
 
   websocket:
     endpoint: /ws/interview
@@ -103,7 +73,6 @@ app:
     allowed-origins: ${CORS_ORIGINS:*}
 
   prompt:
-    # 相对于 classpath 的 prompt 目录
     location: prompts
 
   interview:

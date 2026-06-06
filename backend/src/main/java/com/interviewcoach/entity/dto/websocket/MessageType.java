@@ -35,5 +35,8 @@ public enum MessageType {
     VOICE_END,
 
     /** TTS 合成的音频（Base64编码） */
-    AUDIO
+    AUDIO,
+
+    /** 语音识别后生成的文字（用户语音的文本结果） */
+    VOICE_TEXT
 }

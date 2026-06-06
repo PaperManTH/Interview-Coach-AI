@@ -11,7 +11,6 @@ import jakarta.websocket.*;
 import jakarta.websocket.server.ServerEndpoint;
 import lombok.extern.slf4j.Slf4j;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -82,7 +81,7 @@ public class InterviewWsEndpoint {
         WebSocketSessionManager.safeClose(session);
     }
 
-    @OnMessage
+    @OnMessage(maxMessageSize = 10485760)
     public void onMessage(Session session, String message) {
         if (sessionManager == null) return;
         
@@ -97,12 +96,12 @@ public class InterviewWsEndpoint {
         }
     }
 
-    @OnMessage
+    @OnMessage(maxMessageSize = 10485760)
     public void onBinary(Session session, byte[] data, boolean last) {
         log.debug("[WS] 收到二进制消息 len={}, last={}", data.length, last);
     }
 
-    private void handleMessage(Session session, MessageDTO msg) {
+    private void handleMessage(Session session, MessageDTO msg) throws IOException {
         if (msg.getType() == null) {
             sendError(session, "消息类型不能为空");
             return;
@@ -158,7 +157,7 @@ public class InterviewWsEndpoint {
                 .build());
     }
 
-    private void handleVoiceChunk(Session session, MessageDTO msg) {
+    private void handleVoiceChunk(Session session, MessageDTO msg) throws IOException {
         // 累积 Base64 编码的音频片段
         String chunk = msg.getContent();
         if (chunk != null && !chunk.isEmpty()) {
@@ -186,12 +185,14 @@ public class InterviewWsEndpoint {
         @SuppressWarnings("unchecked")
         var buf = (java.io.ByteArrayOutputStream) session.getUserProperties().remove("audioBuffer");
         Path audioPath = null;
+        int audioSize = 0;
 
         if (buf != null && buf.size() > 0) {
             try {
                 audioPath = Files.createTempFile("iflytek_asr_", ".pcm");
                 Files.write(audioPath, buf.toByteArray());
-                log.info("[WS] 音频临时文件: {} ({} bytes)", audioPath, buf.size());
+                audioSize = buf.size();
+                log.info("[WS] 音频临时文件: {} ({} bytes)", audioPath, audioSize);
             } catch (IOException e) {
                 log.error("[WS] 写入音频临时文件失败", e);
             }
@@ -203,6 +204,7 @@ public class InterviewWsEndpoint {
                 byte[] audioBytes = Base64.getDecoder().decode(msg.getContent());
                 audioPath = Files.createTempFile("iflytek_asr_", ".pcm");
                 Files.write(audioPath, audioBytes);
+                audioSize = audioBytes.length;
                 log.info("[WS] 音频临时文件(来自 content): {} ({} bytes)", audioPath, audioBytes.length);
             } catch (Exception e) {
                 log.error("[WS] 写入音频临时文件失败", e);
@@ -214,7 +216,6 @@ public class InterviewWsEndpoint {
             voiceText = asrService.transcribe(userId, audioPath);
             try { Files.deleteIfExists(audioPath); } catch (IOException ignored) {}
         } else if (asrService != null) {
-            // 回退到 Mock
             voiceText = asrService.transcribe(userId, null);
         } else {
             voiceText = "语音识别服务未就绪";
@@ -222,6 +223,18 @@ public class InterviewWsEndpoint {
 
         log.info("[WS] ASR 结果: {}", voiceText);
 
+        // 1. 先将语音识别文字作为用户消息回传到前端（用 VOICE_TEXT 类型标识）
+        MessageDTO voiceTextMsg = MessageDTO.builder()
+                .id(UUID.randomUUID().toString())
+                .type(MessageType.VOICE_TEXT)
+                .sender(msg.getSender() != null ? msg.getSender() : "user")
+                .content(voiceText != null ? voiceText : "语音识别失败")
+                .timestamp(System.currentTimeMillis())
+                .sessionId(session.getId())
+                .build();
+        sendMessage(session, voiceTextMsg);
+
+        // 2. 生成 AI 回复
         String aiResponse = callAiService(userId, voiceText);
 
         MessageDTO reply = MessageDTO.builder()
@@ -234,7 +247,7 @@ public class InterviewWsEndpoint {
                 .build();
         sendMessage(session, reply);
 
-        // TTS
+        // 3. TTS
         synthesizeAndSend(session, userId, aiResponse);
     }
 

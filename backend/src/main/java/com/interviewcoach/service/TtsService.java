@@ -54,7 +54,8 @@ public class TtsService {
 
         if ("iflytek".equalsIgnoreCase(provider)) {
             String userApiKey = userCfg != null ? userCfg.getTtsApiKey() : null;
-            return synthesizeWithIflytek(text, userApiKey);
+            String voice = userCfg != null ? userCfg.getTtsVoice() : null;
+            return synthesizeWithIflytek(text, userApiKey, voice);
         }
 
         String apiKey = resolveApiKey(userCfg, provider);
@@ -98,7 +99,8 @@ public class TtsService {
 
         if ("iflytek".equalsIgnoreCase(provider)) {
             String userApiKey = userCfg != null ? userCfg.getTtsApiKey() : null;
-            String base64 = synthesizeWithIflytek(text, userApiKey);
+            String voice = userCfg != null ? userCfg.getTtsVoice() : null;
+            String base64 = synthesizeWithIflytek(text, userApiKey, voice);
             if (base64 != null) {
                 byte[] audio = Base64.getDecoder().decode(base64);
                 Files.write(outputPath, audio);
@@ -129,15 +131,21 @@ public class TtsService {
         }
     }
 
-    // ========== 讯飞 TTS ==========
+    // ========== 讯飞超拟人 TTS ==========
 
-    private String synthesizeWithIflytek(String text, String userApiKey) {
-        log.info("[TTS] 使用讯飞语音合成, textLen={}", text.length());
+    private String synthesizeWithIflytek(String text, String userApiKey, String voice) {
+        log.info("[TTS] 使用讯飞超拟人语音合成, textLen={}", text.length());
+        if (isBlank(userApiKey)) {
+            log.warn("[TTS] 用户未配置讯飞API Key，跳过合成");
+            return null;
+        }
         try {
-            IflytekTtsProvider provider = new IflytekTtsProvider(userApiKey, "xiaoyan");
+            String defaultVoice = "x5_lingfeiyi_flow";
+            String finalVoice = voice != null && !voice.isBlank() ? voice : defaultVoice;
+            IflytekTtsProvider provider = new IflytekTtsProvider(userApiKey, finalVoice);
             return provider.synthesize(text);
         } catch (Exception e) {
-            log.error("[TTS] 讯飞合成失败: {}", e.getMessage());
+            log.error("[TTS] 讯飞超拟人合成失败: {}", e.getMessage());
             return null;
         }
     }

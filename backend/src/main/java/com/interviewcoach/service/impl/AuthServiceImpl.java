@@ -248,15 +248,15 @@ public class AuthServiceImpl implements AuthService {
 
         String accessToken;
         try {
+            // GitHub OAuth 要求使用 application/x-www-form-urlencoded 格式
+            String formData = String.format("client_id=%s&client_secret=%s&code=%s",
+                    githubClientId, githubClientSecret, code);
+            
             var tokenResp = restClient.post()
                     .uri("https://github.com/login/oauth/access_token")
-                    .contentType(MediaType.APPLICATION_JSON)
+                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                     .accept(MediaType.APPLICATION_JSON)
-                    .body(Map.of(
-                            "client_id", githubClientId,
-                            "client_secret", githubClientSecret,
-                            "code", code
-                    ))
+                    .body(formData)
                     .retrieve()
                     .body(Map.class);
 
