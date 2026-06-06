@@ -69,10 +69,19 @@ function clearResume() {
             <span class="nav-label">Settings</span>
           </button>
           <div v-if="auth.isLoggedIn" class="user-chip">
-            <img v-if="auth.avatarUrl" :src="auth.avatarUrl" class="avatar" alt="" />
-            <div v-else class="avatar fallback">{{ (auth.username || 'U').charAt(0).toUpperCase() }}</div>
+            <div
+              class="avatar-clickable"
+              @click="router.push('/profile')"
+              title="个人主页"
+            >
+              <div class="avatar-glow">
+                <img v-if="auth.avatarUrl" :src="auth.avatarUrl" class="avatar" alt="" />
+                <div v-else class="avatar fallback">{{ (auth.username || 'U').charAt(0).toUpperCase() }}</div>
+              </div>
+              <span class="avatar-badge">👤</span>
+            </div>
             <span class="username">{{ auth.username || 'User' }}</span>
-            <button class="logout-btn" @click="auth.logout()" title="Log out">↩</button>
+            <button class="logout-btn" @click="auth.logout()" title="登出">↩</button>
           </div>
           <button v-else class="nav-btn primary" @click="router.push('/login')">登录 / Sign In</button>
         </nav>
@@ -262,19 +271,87 @@ function clearResume() {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 6px 6px 12px;
+  padding: 4px 4px 4px 14px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.65);
   border: 1px solid rgba(148, 163, 184, 0.3);
   backdrop-filter: blur(4px);
+  position: relative;
 }
+
+/* ---- 头像可点击区 ---- */
+.avatar-clickable {
+  position: relative;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.avatar-glow {
+  width: 38px; height: 38px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 250ms cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+}
+/* 呼吸光环动画 */
+.avatar-glow::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  background: conic-gradient(from 0deg, #3b82f6, #8b5cf6, #3b82f6) border-box;
+  -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 250ms;
+}
+.avatar-clickable:hover .avatar-glow::before {
+  opacity: 1;
+  animation: glow-rotate 2s linear infinite;
+}
+@keyframes glow-rotate {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+.avatar-clickable:hover .avatar-glow {
+  transform: scale(1.08);
+}
+.avatar-clickable:active .avatar-glow {
+  transform: scale(0.95);
+}
+
+/* ---- 角标指示器 ---- */
+.avatar-badge {
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #3b82f6, #6366f1);
+  border: 2px solid #fff;
+  font-size: 10px;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.35);
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* ---- 头像本体 ---- */
 .avatar {
-  width: 28px; height: 28px;
+  width: 36px; height: 36px;
   border-radius: 50%;
   border: 2px solid #fff;
   box-shadow: 0 0 0 1px rgba(148, 163, 184, 0.3);
   background: #f1f5f9;
   object-fit: cover;
+  display: block;
+  position: relative;
+  z-index: 1;
 }
 .avatar.fallback {
   display: flex;
@@ -282,10 +359,9 @@ function clearResume() {
   justify-content: center;
   background: linear-gradient(135deg, #3b82f6, #6366f1);
   color: #fff;
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 15px; font-weight: 700;
 }
-.username { font-size: 13px; font-weight: 600; color: #1e293b; }
+.username { font-size: 14px; font-weight: 600; color: #1e293b; }
 .logout-btn {
   border: none; background: transparent;
   color: #64748b;

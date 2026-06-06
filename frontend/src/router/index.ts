@@ -34,6 +34,12 @@ const routes: RouteRecordRaw[] = [
     meta: { title: 'Settings', requiresAuth: true },
   },
   {
+    path: '/profile',
+    name: 'Profile',
+    component: () => import('@/pages/Profile.vue'),
+    meta: { title: 'Profile', requiresAuth: true },
+  },
+  {
     path: '/:pathMatch(.*)*',
     redirect: '/',
   },

@@ -9,6 +9,7 @@ import type {
   ResumeResponse,
   UploadProgressEvent,
   UploadResult,
+  ResumeParsedData,
 } from '@/types/resume';
 
 const UPLOAD_URL = '/api/resume/upload';
@@ -147,4 +148,69 @@ export function uploadResume(
     // 9. 发送
     xhr.send(formData);
   });
+}
+
+const MANUAL_URL = '/api/resume/manual';
+
+/** 手动录入简历信息（发送拼接文本，后端 LLM 解析） */
+export async function saveManualResume(
+  resumeText: string,
+  userId?: string,
+): Promise<ResumeResponse> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (userId && userId.trim()) {
+    headers['X-User-Id'] = userId.trim();
+  }
+
+  const res = await fetch(MANUAL_URL, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ resumeText }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new ResumeUploadError(
+      err.message || '保存失败',
+      'SERVER',
+      res.status,
+      err.code,
+      err.message,
+      err.traceId,
+    );
+  }
+
+  const body: ApiResponse<ResumeResponse> = await res.json();
+  if (body.code !== 0) {
+    throw new ResumeUploadError(
+      body.message || '保存失败',
+      'SERVER',
+      res.status,
+      body.code,
+      body.message,
+      body.traceId,
+    );
+  }
+
+  return body.data;
+}
+
+/** 获取已保存的手动简历 */
+export async function getManualResume(
+  userId?: string,
+): Promise<ResumeParsedData | null> {
+  const headers: Record<string, string> = {};
+  if (userId && userId.trim()) {
+    headers['X-User-Id'] = userId.trim();
+  }
+
+  const res = await fetch(MANUAL_URL, { headers });
+  if (!res.ok) return null;
+
+  const body: ApiResponse<{ exists: boolean; data?: ResumeParsedData }> = await res.json();
+  if (body.code !== 0 || !body.data?.exists) return null;
+
+  return body.data.data ?? null;
 }

@@ -109,6 +109,79 @@ public class ResumeServiceImpl implements ResumeService {
         return buildResponse(profile);
     }
 
+    // ---- 手动录入 ----
+
+    @Override
+    public ResumeResponse saveManual(String resumeText, String userId) {
+        if (resumeText == null || resumeText.isBlank()) {
+            throw new FileUploadException(400, "EMPTY_DATA", "简历数据为空");
+        }
+
+        log.info("[Resume] 手动录入，文本长度={}, userId={}", resumeText.length(), userId);
+
+        // 调 LLM 解析为结构化 JSON
+        String parsedJson;
+        try {
+            parsedJson = analyzeWithLLM(resumeText);
+        } catch (Exception e) {
+            log.error("[Resume] LLM 手动解析失败: {}", e.getMessage());
+            parsedJson = fallbackExtract(resumeText);
+        }
+
+        // 查找该用户已有简历（不区分手动/上传，一个用户只有一份简历）
+        ResumeProfile existing = mapper.selectOne(
+                new LambdaQueryWrapper<ResumeProfile>()
+                        .eq(ResumeProfile::getUserId, userId)
+                        .orderByDesc(ResumeProfile::getId)
+                        .last("LIMIT 1"));
+
+        if (existing != null) {
+            // 只更新 parsed_json，保留原有的 resume_text 和 file_name
+            boolean updated = mapper.update(null,
+                    new LambdaUpdateWrapper<ResumeProfile>()
+                            .eq(ResumeProfile::getId, existing.getId())
+                            .set(ResumeProfile::getParsedJson, parsedJson)) > 0;
+            if (!updated) {
+                ResumeProfile profile = new ResumeProfile();
+                profile.setUserId(userId);
+                profile.setParsedJson(parsedJson);
+                mapper.insert(profile);
+                log.info("[Resume] 手动录入更新失败，改为新增 userId={}", userId);
+            } else {
+                existing.setParsedJson(parsedJson);
+                log.info("[Resume] 手动录入覆盖更新 id={}, userId={}", existing.getId(), userId);
+                return buildResponse(existing);
+            }
+        } else {
+            ResumeProfile profile = new ResumeProfile();
+            profile.setUserId(userId);
+            profile.setParsedJson(parsedJson);
+            mapper.insert(profile);
+            log.info("[Resume] 手动录入新增 id={}, userId={}", profile.getId(), userId);
+            return buildResponse(profile);
+        }
+        return buildResponse(existing);
+    }
+
+    @Override
+    public ResumeParsedData getManual(String userId) {
+        ResumeProfile profile = mapper.selectOne(
+                new LambdaQueryWrapper<ResumeProfile>()
+                        .eq(ResumeProfile::getUserId, userId)
+                        .orderByDesc(ResumeProfile::getId)
+                        .last("LIMIT 1"));
+        if (profile == null || profile.getParsedJson() == null
+                || profile.getParsedJson().isBlank() || "{}".equals(profile.getParsedJson())) {
+            return null;
+        }
+        try {
+            return objectMapper.readValue(profile.getParsedJson(), ResumeParsedData.class);
+        } catch (JsonProcessingException e) {
+            log.warn("[Resume] 手动简历 JSON 反序列化失败 userId={}", userId);
+            return null;
+        }
+    }
+
     // ---- 校验 ----
 
     private void validate(MultipartFile file) {
