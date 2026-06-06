@@ -40,7 +40,7 @@
                   @input="onLlmApiKeyInput"
                   @focus="onLlmApiKeyFocus"
                   @blur="onLlmApiKeyBlur"
-                  placeholder="sk-xxx"
+                  placeholder="DeepSeek API Key (sk-xxx)"
                   :disabled="form.llmType === 'mock'"
                 />
               </div>
@@ -87,7 +87,7 @@
                   @input="onAsrApiKeyInput"
                   @focus="onAsrApiKeyFocus"
                   @blur="onAsrApiKeyBlur"
-                  placeholder="sk-xxx"
+                  placeholder="讯飞ASR: appid:apikey:apisecret"
                   :disabled="form.asrType === 'mock'"
                 />
               </div>
@@ -95,10 +95,6 @@
             <div class="form-group">
               <label>自定义 API 地址（可选）</label>
               <input v-model="form.asrBaseUrl" placeholder="留空使用默认地址" />
-            </div>
-            <div v-if="form.asrType === 'azure'" class="form-group">
-              <label>Azure Region <span style="color:#94a3b8">(必填)</span></label>
-              <input v-model="form.asrRegion" placeholder="例如 eastasia、eastus" />
             </div>
           </div>
         </div>
@@ -128,7 +124,7 @@
                   @input="onTtsApiKeyInput"
                   @focus="onTtsApiKeyFocus"
                   @blur="onTtsApiKeyBlur"
-                  placeholder="sk-xxx"
+                  placeholder="讯飞TTS: appid:apikey:apisecret"
                   :disabled="form.ttsType === 'mock'"
                 />
               </div>
@@ -137,17 +133,13 @@
               <div class="form-group">
                 <label>语音类型</label>
                 <select v-model="form.ttsVoice">
-                  <option v-for="v in TTS_VOICES" :key="v.value" :value="v.value">{{ v.label }}</option>
+                  <option v-for="v in currentTtsVoices" :key="v.value" :value="v.value">{{ v.label }}</option>
                 </select>
               </div>
               <div class="form-group">
                 <label>自定义 API 地址（可选）</label>
                 <input v-model="form.ttsBaseUrl" placeholder="留空使用默认地址" />
               </div>
-            </div>
-            <div v-if="form.ttsType === 'azure'" class="form-group">
-              <label>Azure Region <span style="color:#94a3b8">(必填)</span></label>
-              <input v-model="form.ttsRegion" placeholder="例如 eastasia、eastus" />
             </div>
           </div>
         </div>
@@ -220,11 +212,13 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
+import { useAuthStore } from '@/stores/authStore';
 import { getUserConfig, saveUserConfig, type UserConfigRequest } from '../api/config';
-import { LLM_PROVIDERS, ASR_PROVIDERS, TTS_PROVIDERS, TTS_VOICES } from '@/constants';
+import { LLM_PROVIDERS, ASR_PROVIDERS, TTS_PROVIDERS, TTS_VOICES, IFLYTEK_CN_VOICES, IFLYTEK_EN_VOICES } from '@/constants';
 
 const router = useRouter();
-const userId = ref('current-user');
+const authStore = useAuthStore();
+const userId = computed(() => authStore.userId || 'current-user');
 
 const form = reactive<UserConfigRequest>({
   llmType: 'mock',
@@ -276,6 +270,13 @@ const ttsApiKeyDisplay = computed(() => {
   if (ttsEditing.value) return form.ttsApiKey;
   if (ttsKeyConfigured.value && !form.ttsApiKey) return MASK_PLACEHOLDER;
   return form.ttsApiKey;
+});
+
+const currentTtsVoices = computed(() => {
+  if (form.ttsType === 'iflytek') {
+    return [...IFLYTEK_CN_VOICES, ...IFLYTEK_EN_VOICES];
+  }
+  return TTS_VOICES;
 });
 
 // ---- 交互事件 ----

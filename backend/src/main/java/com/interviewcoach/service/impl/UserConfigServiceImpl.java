@@ -10,7 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
- * 用户配置服务实现 - MyBatis-Plus 版。
+ * 用户配置服务实现
  */
 @Slf4j
 @Service
@@ -29,7 +29,7 @@ public class UserConfigServiceImpl implements UserConfigService {
 
     @Override
     public UserProviderConfig saveConfig(String userId, UserProviderConfig config) {
-        // 如果 apiKey 为空，保留已有值（避免前端 ***** 占位符覆盖真实 Key）
+        // 如果 apiKey 为空，保留已有值
         UserProviderConfig existing = getConfig(userId);
         if (existing != null) {
             if (isBlank(config.getAsrApiKey())) {

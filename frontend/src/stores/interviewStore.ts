@@ -1,8 +1,10 @@
 import { defineStore } from 'pinia';
 import type { ChatMessage, SessionStatus } from '@/types/chat';
-import { createWebSocketClient, destroyWebSocketClient, type WebSocketMessage } from '@/utils/websocket';
+import { createWebSocketClient, getWebSocketClient, destroyWebSocketClient, type WebSocketMessage } from '@/utils/websocket';
 import { getAudioRecorder, destroyAudioRecorder } from '@/utils/audioRecorder';
 import { getSpeechSynthesizer, destroySpeechSynthesizer, type SpeechCallbacks } from '@/utils/speechSynthesis';
+import { convertToPcm, pcmToBase64 } from '@/utils/audioConverter';
+import { useAuthStore } from '@/stores/authStore';
 
 const OPENING_BY_SCENE: Record<string, string> = {
   hr: "Hi, thanks for joining today. Let's start with a quick self-introduction.",
@@ -58,9 +60,12 @@ export const useInterviewStore = defineStore('interview', {
 
     connectWebSocket() {
       if (!this.sessionId) return;
-      
+
+      const authStore = useAuthStore();
+      const realUserId = authStore.userId || this.sessionId;
+
       const wsClient = createWebSocketClient({
-        userId: this.sessionId,
+        userId: realUserId,
         reconnectDelay: 5000,
         maxReconnectAttempts: 5
       });
@@ -87,6 +92,12 @@ export const useInterviewStore = defineStore('interview', {
         case 'TEXT':
           this.handleTextMessage(message);
           break;
+        case 'AUDIO':
+          this.handleAudioMessage(message);
+          break;
+        case 'VOICE_TEXT':
+          this.handleVoiceTextMessage(message);
+          break;
         case 'PONG':
           console.log('[WS] 收到心跳响应');
           break;
@@ -96,6 +107,20 @@ export const useInterviewStore = defineStore('interview', {
         default:
           console.log('[WS] 未知消息类型:', message.type);
       }
+    },
+
+    handleVoiceTextMessage(message: WebSocketMessage) {
+      // 后端返回的语音识别文字，作为用户语音消息加入聊天
+      const transcript = message.content || '语音识别失败';
+      this.messages.push({
+        id: uid() + '-' + Date.now(),
+        role: 'user',
+        content: transcript,
+        createdAt: message.timestamp || Date.now(),
+        isVoice: true
+      });
+      this.status = 'thinking'; // 接下来等待 AI 回复
+      console.log('[ASR] 识别到文字:', transcript);
     },
 
     handleChatMessage(message: WebSocketMessage) {
@@ -125,11 +150,37 @@ export const useInterviewStore = defineStore('interview', {
     },
 
     handleTextMessage(message: WebSocketMessage) {
+      // 根据 sender 区分用户消息、AI消息和系统消息
+      console.log('[WS] 收到文本消息:', message);
+      let role: 'user' | 'ai' | 'system';
+      if (message.sender === 'user') {
+        role = 'user';
+      } else if (message.sender === 'system') {
+        role = 'system';
+      } else {
+        role = 'ai'; // assistant 或其他都当作 AI
+      }
+      console.log('[WS] 消息角色:', role, 'sender:', message.sender);
       this.messages.push({
-        id: uid(),
-        role: 'ai',
+        id: message.id || uid(),
+        role: role,
         content: message.content,
-        createdAt: Date.now()
+        createdAt: message.timestamp || Date.now()
+      });
+      // 只有 AI 消息到达后才设为 idle
+      if (role === 'ai') {
+        this.status = 'idle';
+      }
+    },
+
+    handleAudioMessage(message: WebSocketMessage) {
+      if (!message.content) return;
+      // 将 Base64 音频数据转换为 Audio 并播放
+      const audio = new Audio('data:audio/wav;base64,' + message.content);
+      audio.play().then(() => {
+        console.log('[TTS] 音频播放完成');
+      }).catch((e) => {
+        console.error('[TTS] 音频播放失败:', e);
       });
     },
 
@@ -137,38 +188,47 @@ export const useInterviewStore = defineStore('interview', {
       const trimmed = text.trim();
       if (!trimmed || this.status !== 'idle') return;
 
-      this.messages.push({
-        id: uid(),
-        role: 'user',
-        content: trimmed,
-        createdAt: Date.now()
-      });
-
       this.status = 'thinking';
-      await delay(600);
 
-      const reply = MOCK_REPLIES[this.mockReplyCursor % MOCK_REPLIES.length];
-      this.mockReplyCursor += 1;
-
-      const aiMessageId = uid();
-      this.messages.push({
-        id: aiMessageId,
-        role: 'ai',
-        content: '',
-        createdAt: Date.now(),
-        streaming: true
-      });
-      this.status = 'speaking';
-
-      const chunks = reply.match(/.{1,6}/g) || [reply];
-      for (const chunk of chunks) {
-        this.appendAiChunk(aiMessageId, chunk);
-        await delay(60);
+      // 通过 WebSocket 发送到后端（LLM + TTS），等待连接就绪
+      console.log('[Chat] 当前状态: status=', this.status, 'isWsConnected=', this.isWsConnected);
+      await waitForWs(this, 5000);
+      const wsClient = getWebSocketClient();
+      console.log('[Chat] wsClient存在=', !!wsClient, '已连接=', wsClient?.isConnectedState());
+      if (wsClient && wsClient.isConnectedState()) {
+        wsClient.send({
+          id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          type: 'TEXT',
+          sender: this.sessionId || 'anonymous',
+          receiver: '',
+          content: trimmed,
+          timestamp: Date.now()
+        });
+        console.log('[Chat] 已发送文本到后端');
+      } else {
+        // WebSocket 未连接，降级为 Mock
+        console.warn('[Chat] WebSocket 未连接，使用 Mock');
+        await delay(600);
+        const reply = MOCK_REPLIES[this.mockReplyCursor % MOCK_REPLIES.length];
+        this.mockReplyCursor += 1;
+        const aiMessageId = uid();
+        this.messages.push({
+          id: aiMessageId,
+          role: 'ai',
+          content: '',
+          createdAt: Date.now(),
+          streaming: true
+        });
+        this.status = 'speaking';
+        const chunks = reply.match(/.{1,6}/g) || [reply];
+        for (const chunk of chunks) {
+          this.appendAiChunk(aiMessageId, chunk);
+          await delay(60);
+        }
+        const target = this.messages.find((m) => m.id === aiMessageId);
+        if (target) target.streaming = false;
+        this.status = 'idle';
       }
-
-      const target = this.messages.find((m) => m.id === aiMessageId);
-      if (target) target.streaming = false;
-      this.status = 'idle';
     },
 
     appendAiChunk(messageId: string, chunk: string) {
@@ -217,12 +277,36 @@ export const useInterviewStore = defineStore('interview', {
       if (audioBlob) {
         console.log('[Recorder] 录音完成，时长:', this.recordingDuration, '秒');
         this.status = 'processing';
-        
-        await delay(1000);
-        
-        const mockTranscript = this.generateMockTranscript();
-        this.audioTranscript = mockTranscript;
-        await this.sendUserMessage(mockTranscript);
+
+        // 将 webm/opus Blob 转换为 PCM Int16 16kHz mono Base64
+        try {
+          const pcmBuffer = await convertToPcm(audioBlob);
+          const base64 = pcmToBase64(pcmBuffer);
+          console.log('[Recorder] PCM 转换完成，大小:', base64.length, 'chars');
+          await waitForWs(this, 5000);
+          const wsClient = getWebSocketClient();
+          if (wsClient && wsClient.isConnectedState()) {
+            wsClient.send({
+              id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              type: 'VOICE_END',
+              sender: this.sessionId || 'anonymous',
+              receiver: '',
+              content: base64,
+              timestamp: Date.now()
+            });
+            console.log('[Recorder] 已发送 PCM 音频到后端');
+          } else {
+            console.warn('[Recorder] WebSocket 未连接，使用模拟文本');
+            const mockTranscript = this.generateMockTranscript();
+            this.audioTranscript = mockTranscript;
+            await this.sendUserMessage(mockTranscript);
+          }
+        } catch (e) {
+          console.error('[Recorder] PCM 转换失败，降级为模拟文本:', e);
+          const mockTranscript = this.generateMockTranscript();
+          this.audioTranscript = mockTranscript;
+          await this.sendUserMessage(mockTranscript);
+        }
       } else {
         this.status = 'idle';
       }
@@ -299,4 +383,19 @@ export const useInterviewStore = defineStore('interview', {
 
 function delay(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+/**
+ * 等待 WebSocket 连接就绪，超时后不阻塞。
+ */
+function waitForWs(store: { isWsConnected: boolean }, timeoutMs: number): Promise<void> {
+  const start = Date.now();
+  return new Promise((resolve) => {
+    const check = () => {
+      if (store.isWsConnected) return resolve();
+      if (Date.now() - start >= timeoutMs) return resolve();
+      setTimeout(check, 100);
+    };
+    check();
+  });
 }

@@ -6,9 +6,8 @@ export type InterviewSceneKey = 'hr' | 'technical' | 'pressure';
 export interface InterviewSceneMeta {
   key: InterviewSceneKey;
   title: string;
-  titleZh: string;
+  subtitle: string;
   description: string;
-  descriptionZh: string;
   accent: string; // CSS 色值；用 style 绑定，保持可扩展
   icon: string;   // emoji 占位；后续可替换为 SVG/图标库
 }
@@ -18,27 +17,24 @@ export const INTERVIEW_SCENES: InterviewSceneMeta[] = [
   {
     key: 'hr',
     title: 'HR Interview',
-    titleZh: 'HR 面试',
-    description: 'Typical HR scenarios: self-introduction, career planning, conflict resolution, teamwork.',
-    descriptionZh: '典型 HR 场景：自我介绍、职业规划、冲突解决、团队协作。',
+    subtitle: '行为 & 综合素质',
+    description: '典型 HR 场景：自我介绍、职业规划、冲突解决、团队协作。',
     accent: '#2563eb',
     icon: '👥'
   },
   {
     key: 'technical',
     title: 'Technical Interview',
-    titleZh: '技术面试',
-    description: 'Job skills, system design, project details, problem troubleshooting and trade-offs.',
-    descriptionZh: '岗位技术栈、系统设计、项目细节、问题定位与权衡。',
+    subtitle: '技术深度追问',
+    description: '岗位技术栈、系统设计、项目细节、问题定位与权衡。',
     accent: '#0ea5e9',
     icon: '💻'
   },
   {
     key: 'pressure',
     title: 'Pressure Interview',
-    titleZh: '压力面试',
-    description: 'Simulate high-pressure questioning and uncertainty scenarios, train on-the-spot response and emotional management.',
-    descriptionZh: '模拟高压追问与不确定性场景，训练临场反应与情绪管理。',
+    subtitle: '压力面试',
+    description: '模拟高压追问与不确定性场景，训练临场反应与情绪管理。',
     accent: '#f97316',
     icon: '🔥'
   }

@@ -13,7 +13,7 @@ const auth = useAuthStore();
   <div class="home">
     <header class="header">
       <div class="logo">
-        <span class="logo-icon">🎯</span>
+        <img src="@/assets/logo.png" class="logo-icon" alt="Interview Coach AI" />
         <div>
           <span class="logo-title">Interview Coach AI</span>
           <span class="logo-subtitle">AI 面试教练</span>
@@ -21,10 +21,7 @@ const auth = useAuthStore();
       </div>
       <div class="header-actions">
         <button v-if="auth.isLoggedIn" class="settings-btn" @click="router.push('/settings')">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
-            <circle cx="12" cy="12" r="3"/>
-          </svg>
+          <img src="@/assets/setting_icon.png" class="settings-icon" alt="Settings" />
           <span>Settings</span>
         </button>
         <div v-if="auth.isLoggedIn" class="user-info">
@@ -70,21 +67,21 @@ const auth = useAuthStore();
 
     <section class="features">
       <div class="feature-card">
-        <div class="feature-icon">💬</div>
+        <img src="@/assets/chat_icon.png" class="feature-icon" alt="Chat" />
         <BilingualText en="Real-time Conversation" zh="实时对话" />
         <p class="feature-desc">
           <BilingualText en="Engage in natural conversations" zh="进行自然对话" />
         </p>
       </div>
       <div class="feature-card">
-        <div class="feature-icon">🎙️</div>
+        <img src="@/assets/voice_icon.png" class="feature-icon" alt="Voice" />
         <BilingualText en="Voice Recognition" zh="语音识别" />
         <p class="feature-desc">
           <BilingualText en="Speak and get instant feedback" zh="说话并获得即时反馈" />
         </p>
       </div>
       <div class="feature-card">
-        <div class="feature-icon">🎯</div>
+        <img src="@/assets/tool_icon.png" class="feature-icon" alt="Scenarios" />
         <BilingualText en="Multiple Scenarios" zh="多种场景" />
         <p class="feature-desc">
           <BilingualText en="HR, technical, and pressure interviews" zh="HR、技术、压力面试" />
@@ -127,7 +124,8 @@ const auth = useAuthStore();
 }
 
 .logo-icon {
-  font-size: 32px;
+  width: 40px;
+  height: 40px;
 }
 
 .logo-title {
@@ -161,6 +159,11 @@ const auth = useAuthStore();
   background: #f8fafc;
   border-color: #cbd5e1;
   color: #334155;
+}
+
+.settings-icon {
+  width: 18px;
+  height: 18px;
 }
 
 .header-actions {
@@ -315,7 +318,8 @@ const auth = useAuthStore();
 }
 
 .feature-icon {
-  font-size: 28px;
+  width: 32px;
+  height: 32px;
   margin-bottom: 12px;
 }
 

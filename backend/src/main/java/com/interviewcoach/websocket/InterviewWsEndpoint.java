@@ -127,6 +127,18 @@ public class InterviewWsEndpoint {
         String userId = getUserId(session);
         log.info("[WS] 收到消息 sessionId={}, content={}", session.getId(), userMessage);
 
+        // 1. 先将用户消息回传给前端（让用户看到自己发送的消息）
+        MessageDTO userMsg = MessageDTO.builder()
+                .id(UUID.randomUUID().toString())
+                .type(MessageType.TEXT)
+                .sender("user")  // 明确标记为用户消息
+                .content(userMessage)
+                .timestamp(System.currentTimeMillis())
+                .sessionId(session.getId())
+                .build();
+        sendMessage(session, userMsg);
+
+        // 2. 生成 AI 回复
         String aiResponse = callAiService(userId, userMessage);
 
         MessageDTO reply = MessageDTO.builder()
@@ -141,7 +153,7 @@ public class InterviewWsEndpoint {
         sendMessage(session, reply);
         sendMessage(session, MessageDTO.ack(msg.getId()));
 
-        // TTS 语音合成（异步，不阻塞回复）
+        // 3. TTS 语音合成（异步，不阻塞回复）
         synthesizeAndSend(session, userId, aiResponse);
     }
 
