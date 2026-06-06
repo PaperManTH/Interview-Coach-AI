@@ -15,9 +15,9 @@ public interface ResumeService {
     ResumeResponse uploadAndParse(MultipartFile file, String userId);
 
     /**
-     * 手动录入简历信息（前端拼接文本，后端调 LLM 解析）。
+     * 手动录入简历信息（前端直接传结构化数据，后端不调 LLM）。
      */
-    ResumeResponse saveManual(String resumeText, String userId);
+    ResumeResponse saveManual(ResumeParsedData data, String userId);
 
     /**
      * 获取用户已保存的手动简历（resumeText 为 null 的记录）。

@@ -152,9 +152,9 @@ export function uploadResume(
 
 const MANUAL_URL = '/api/resume/manual';
 
-/** 手动录入简历信息（发送拼接文本，后端 LLM 解析） */
+/** 手动录入简历信息（直接传结构化数据，后端不调 LLM） */
 export async function saveManualResume(
-  resumeText: string,
+  data: ResumeParsedData,
   userId?: string,
 ): Promise<ResumeResponse> {
   const headers: Record<string, string> = {
@@ -167,7 +167,7 @@ export async function saveManualResume(
   const res = await fetch(MANUAL_URL, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ resumeText }),
+    body: JSON.stringify(data),
   });
 
   if (!res.ok) {

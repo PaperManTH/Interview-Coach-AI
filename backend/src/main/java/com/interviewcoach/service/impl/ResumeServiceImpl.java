@@ -1,6 +1,7 @@
 package com.interviewcoach.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.interviewcoach.entity.ResumeProfile;
@@ -85,24 +86,27 @@ public class ResumeServiceImpl implements ResumeService {
             parsedJson = "{}";
         }
 
-        // 4. 入库（同一用户覆盖旧记录）
+        // 入库（同一用户仅保留一份简历，先清理历史重复数据）
         ResumeProfile profile = new ResumeProfile();
         profile.setUserId(userId);
         profile.setResumeText(resumeText);
         profile.setParsedJson(parsedJson);
         profile.setFileName(file.getOriginalFilename());
 
-        // 查旧记录
+        ensureSingleRecord(userId);
+
         ResumeProfile existing = mapper.selectOne(
                 new LambdaQueryWrapper<ResumeProfile>()
-                        .eq(ResumeProfile::getUserId, userId));
+                        .eq(ResumeProfile::getUserId, userId)
+                        .orderByDesc(ResumeProfile::getId)
+                        .last("LIMIT 1"));
         if (existing != null) {
             profile.setId(existing.getId());
             mapper.updateById(profile);
-            log.info("[Resume] 覆盖更新 id={}, userId={}", existing.getId(), userId);
+            log.info("[Resume] 上传覆盖更新 id={}, userId={}", existing.getId(), userId);
         } else {
             mapper.insert(profile);
-            log.info("[Resume] 新增入库 id={}, userId={}", profile.getId(), userId);
+            log.info("[Resume] 上传新增入库 id={}, userId={}", profile.getId(), userId);
         }
 
         // 5. 构建响应
@@ -112,23 +116,25 @@ public class ResumeServiceImpl implements ResumeService {
     // ---- 手动录入 ----
 
     @Override
-    public ResumeResponse saveManual(String resumeText, String userId) {
-        if (resumeText == null || resumeText.isBlank()) {
+    public ResumeResponse saveManual(ResumeParsedData data, String userId) {
+        if (data == null) {
             throw new FileUploadException(400, "EMPTY_DATA", "简历数据为空");
         }
 
-        log.info("[Resume] 手动录入，文本长度={}, userId={}", resumeText.length(), userId);
+        log.info("[Resume] 手动录入保存 userId={}", userId);
 
-        // 调 LLM 解析为结构化 JSON
+        // 直接序列化为 JSON，不调 LLM
         String parsedJson;
         try {
-            parsedJson = analyzeWithLLM(resumeText);
-        } catch (Exception e) {
-            log.error("[Resume] LLM 手动解析失败: {}", e.getMessage());
-            parsedJson = fallbackExtract(resumeText);
+            parsedJson = objectMapper.writeValueAsString(data);
+        } catch (JsonProcessingException e) {
+            log.error("[Resume] 手动录入序列化失败: {}", e.getMessage());
+            parsedJson = "{}";
         }
 
-        // 查找该用户已有简历（不区分手动/上传，一个用户只有一份简历）
+        // 查找该用户已有简历，保证一个用户只有一条
+        ensureSingleRecord(userId);
+
         ResumeProfile existing = mapper.selectOne(
                 new LambdaQueryWrapper<ResumeProfile>()
                         .eq(ResumeProfile::getUserId, userId)
@@ -136,31 +142,22 @@ public class ResumeServiceImpl implements ResumeService {
                         .last("LIMIT 1"));
 
         if (existing != null) {
-            // 只更新 parsed_json，保留原有的 resume_text 和 file_name
-            boolean updated = mapper.update(null,
+            // 只更新 parsed_json，保留 resume_text 和 file_name
+            mapper.update(null,
                     new LambdaUpdateWrapper<ResumeProfile>()
                             .eq(ResumeProfile::getId, existing.getId())
-                            .set(ResumeProfile::getParsedJson, parsedJson)) > 0;
-            if (!updated) {
-                ResumeProfile profile = new ResumeProfile();
-                profile.setUserId(userId);
-                profile.setParsedJson(parsedJson);
-                mapper.insert(profile);
-                log.info("[Resume] 手动录入更新失败，改为新增 userId={}", userId);
-            } else {
-                existing.setParsedJson(parsedJson);
-                log.info("[Resume] 手动录入覆盖更新 id={}, userId={}", existing.getId(), userId);
-                return buildResponse(existing);
-            }
-        } else {
-            ResumeProfile profile = new ResumeProfile();
-            profile.setUserId(userId);
-            profile.setParsedJson(parsedJson);
-            mapper.insert(profile);
-            log.info("[Resume] 手动录入新增 id={}, userId={}", profile.getId(), userId);
-            return buildResponse(profile);
+                            .set(ResumeProfile::getParsedJson, parsedJson));
+            existing.setParsedJson(parsedJson);
+            log.info("[Resume] 手动录入覆盖更新 id={}, userId={}", existing.getId(), userId);
+            return buildResponse(existing);
         }
-        return buildResponse(existing);
+
+        ResumeProfile profile = new ResumeProfile();
+        profile.setUserId(userId);
+        profile.setParsedJson(parsedJson);
+        mapper.insert(profile);
+        log.info("[Resume] 手动录入新增 id={}, userId={}", profile.getId(), userId);
+        return buildResponse(profile);
     }
 
     @Override
@@ -180,6 +177,26 @@ public class ResumeServiceImpl implements ResumeService {
             log.warn("[Resume] 手动简历 JSON 反序列化失败 userId={}", userId);
             return null;
         }
+    }
+
+    // ---- 数据一致性 ----
+
+    /**
+     * 确保一个用户只有一条简历记录，删除历史遗留的重复数据。
+     */
+    private void ensureSingleRecord(String userId) {
+        List<ResumeProfile> all = mapper.selectList(
+                new LambdaQueryWrapper<ResumeProfile>()
+                        .eq(ResumeProfile::getUserId, userId)
+                        .orderByDesc(ResumeProfile::getId));
+        if (all.size() <= 1) return;
+
+        // 保留最新的，删除其余
+        ResumeProfile latest = all.get(0);
+        for (int i = 1; i < all.size(); i++) {
+            mapper.deleteById(all.get(i).getId());
+        }
+        log.info("[Resume] 清理重复记录 userId={}, deleted={}, keptId={}", userId, all.size() - 1, latest.getId());
     }
 
     // ---- 校验 ----

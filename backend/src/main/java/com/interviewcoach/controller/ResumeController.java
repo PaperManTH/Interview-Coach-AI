@@ -45,20 +45,18 @@ public class ResumeController {
     }
 
     /**
-     * 手动录入简历信息（前端拼接文本 → 后端 LLM 解析）。
+     * 手动录入简历信息（前端直接传结构化数据，后端不调 LLM）。
      */
     @PostMapping("/manual")
     public ResponseEntity<ApiResponse<ResumeResponse>> saveManual(
-            @RequestBody Map<String, String> body,
+            @RequestBody ResumeParsedData data,
             @RequestHeader(value = "X-User-Id", required = false) String userId) {
 
         if (userId == null || userId.isBlank()) {
             userId = "anonymous";
         }
-        String resumeText = body.get("resumeText");
-        log.info("[ResumeController] 手动录入简历 userId={}, textLen={}", userId,
-                resumeText != null ? resumeText.length() : 0);
-        ResumeResponse resp = resumeService.saveManual(resumeText, userId);
+        log.info("[ResumeController] 手动录入简历 userId={}", userId);
+        ResumeResponse resp = resumeService.saveManual(data, userId);
         return ResponseEntity.ok(ApiResponse.ok(resp));
     }
 

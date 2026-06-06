@@ -8,12 +8,12 @@ import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/authStore';
 import { saveManualResume, getManualResume, ResumeUploadError } from '@/services/resumeApi';
 import bgPng from '@/assets/background.png';
-import infoPng from '@/assets/data_analysis.png';
-import toolPng from '@/assets/tool_icon.png';
-import chatPng from '@/assets/chat_icon.png';
-import studyPng from '@/assets/study_process.png';
-import voicePng from '@/assets/voice_icon.png';
-import settingPng from '@/assets/setting_icon.png';
+import overviewPng from '@/assets/icon_candidate_overview.png';
+import toolPng from '@/assets/icon_skills_list.png';
+import workPng from '@/assets/icon_work_experience.png';
+import projectPng from '@/assets/icon_project_experience.png';
+import strengthsPng from '@/assets/icon_candidate_strengths.png';
+import questionsPng from '@/assets/icon_interview_questions.png';
 
 const router = useRouter();
 const auth = useAuthStore();
@@ -109,36 +109,28 @@ onMounted(async () => {
 
 // ==================== 保存 ====================
 
-function buildResumeText(): string {
-  const nonEmpty = (s: string): string => (s || '').trim();
-  const parts: string[] = [];
-
-  const summary = nonEmpty(form.candidateSummary) || getDefaultSummary();
-  parts.push('## 候选人概览\n' + summary);
-
-  const skills = nonEmpty(form.skills);
-  if (skills) parts.push('## 技能\n' + skills);
-
-  const work = nonEmpty(form.workExperience);
-  if (work) parts.push('## 工作经历\n' + work);
-
-  const projects = nonEmpty(form.projects);
-  if (projects) parts.push('## 项目经验\n' + projects);
-
-  const strengths = nonEmpty(form.strengths);
-  if (strengths) parts.push('## 候选人优势\n' + strengths);
-
-  // 可能的面试问题仅前端展示，不传给后端
-  return parts.join('\n\n');
-}
-
 async function handleSave() {
   saving.value = true;
   errorMsg.value = '';
   saved.value = false;
 
   try {
-    await saveManualResume(buildResumeText(), auth.userId || undefined);
+    // 拆分逗号/换行的字段
+    const skills = form.skills ? form.skills.split(/[,，\n]/).map(s => s.trim()).filter(Boolean) : [];
+    const projects = form.projects ? form.projects.split(/\n/).map(s => s.trim()).filter(Boolean) : [];
+    const workExperience = form.workExperience ? form.workExperience.split(/\n/).map(s => s.trim()).filter(Boolean) : [];
+    const strengths = form.strengths ? form.strengths.split(/[,，\n]/).map(s => s.trim()).filter(Boolean) : [];
+    // 面试问题来自 PDF 上传的 AI 解析，手动保存时保留已有值，不覆盖
+    const questions = form.possibleQuestions ? form.possibleQuestions.split('\n').map(s => s.trim()).filter(Boolean) : [];
+
+    await saveManualResume({
+      candidateSummary: form.candidateSummary.trim(),
+      skills,
+      projects,
+      workExperience,
+      strengths,
+      possibleQuestions: questions,
+    }, auth.userId || undefined);
     saved.value = true;
     setTimeout(() => (saved.value = false), 3000);
   } catch (e) {
@@ -211,7 +203,7 @@ function autoFillDefaults() {
           <div class="form-col wide">
             <div class="section-card">
               <div class="card-header">
-                <div class="card-icon info-icon"><img :src="infoPng" alt="" /></div>
+                <div class="card-icon"><img :src="overviewPng" alt="" /></div>
                 <div class="card-title-group">
                   <div class="card-title">候选人概览</div>
                 </div>
@@ -231,7 +223,7 @@ function autoFillDefaults() {
           <div class="form-col">
             <div class="section-card">
               <div class="card-header">
-                <div class="card-icon tool-icon"><img :src="toolPng" alt="" /></div>
+                <div class="card-icon"><img :src="toolPng" alt="" /></div>
                 <div class="card-title-group">
                   <div class="card-title">技能列表</div>
                   <span class="configured-badge" v-if="skillCount > 0">{{ skillCount }} 项</span>
@@ -252,7 +244,7 @@ function autoFillDefaults() {
           <div class="form-col">
             <div class="section-card">
               <div class="card-header">
-                <div class="card-icon chat-icon"><img :src="chatPng" alt="" /></div>
+                <div class="card-icon"><img :src="workPng" alt="" /></div>
                 <div class="card-title-group">
                   <div class="card-title">工作经历</div>
                 </div>
@@ -272,7 +264,7 @@ function autoFillDefaults() {
           <div class="form-col">
             <div class="section-card">
               <div class="card-header">
-                <div class="card-icon study-icon"><img :src="studyPng" alt="" /></div>
+                <div class="card-icon"><img :src="projectPng" alt="" /></div>
                 <div class="card-title-group">
                   <div class="card-title">项目经验</div>
                 </div>
@@ -292,7 +284,7 @@ function autoFillDefaults() {
           <div class="form-col">
             <div class="section-card">
               <div class="card-header">
-                <div class="card-icon voice-icon"><img :src="voicePng" alt="" /></div>
+                <div class="card-icon"><img :src="strengthsPng" alt="" /></div>
                 <div class="card-title-group">
                   <div class="card-title">候选人优势</div>
                 </div>
@@ -312,7 +304,7 @@ function autoFillDefaults() {
           <div class="form-col wide">
             <div class="section-card readonly-card">
               <div class="card-header">
-                <div class="card-icon setting-icon"><img :src="settingPng" alt="" /></div>
+                <div class="card-icon"><img :src="questionsPng" alt="" /></div>
                 <div class="card-title-group">
                   <div class="card-title">可能的面试问题</div>
                   <span class="configured-badge" v-if="questionCount > 0">{{ questionCount }} 题</span>
@@ -347,7 +339,7 @@ function autoFillDefaults() {
 
         <!-- Feedback Toast -->
         <Transition name="fade">
-          <div v-if="saved" class="toast success">保存成功 — AI 已解析并生成个性化面试问题</div>
+          <div v-if="saved" class="toast success">简历信息已保存</div>
         </Transition>
         <Transition name="fade">
           <div v-if="errorMsg" class="toast error">{{ errorMsg }}</div>
@@ -486,29 +478,24 @@ function autoFillDefaults() {
   background: rgba(248, 250, 252, 0.5);
 }
 .card-icon {
-  width: 48px;
-  height: 48px;
+  width: 54px; height: 54px;
   border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  padding: 8px;
+  padding: 1px;
   box-sizing: border-box;
+  background: rgba(148, 163, 184, 0.1);
 }
 .card-icon img {
   width: 100%;
   height: 100%;
   object-fit: contain;
   display: block;
+  min-width: 0;
+  min-height: 0;
 }
-.info-icon    { background: linear-gradient(135deg, rgba(99, 102, 241, 0.18), rgba(139, 92, 246, 0.12)); }
-.tool-icon    { background: linear-gradient(135deg, rgba(34, 197, 94, 0.18), rgba(16, 185, 129, 0.12)); }
-.chat-icon    { background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(245, 158, 11, 0.15)); }
-.study-icon   { background: linear-gradient(135deg, rgba(59, 130, 246, 0.18), rgba(99, 102, 241, 0.12)); }
-.voice-icon   { background: linear-gradient(135deg, rgba(236, 72, 153, 0.18), rgba(217, 70, 239, 0.12)); }
-.setting-icon { background: linear-gradient(135deg, rgba(59, 130, 246, 0.18), rgba(99, 102, 241, 0.12)); }
-
 .card-title-group { display: flex; align-items: center; gap: 10px; flex: 1; }
 .card-title { font-size: 15px; font-weight: 700; color: #0f172a; }
 
