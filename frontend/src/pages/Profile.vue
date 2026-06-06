@@ -416,7 +416,7 @@ function autoFillDefaults() {
   transform: translateX(-2px);
 }
 .header-content h1 { margin: 0; font-size: 19px; font-weight: 700; color: #0f172a; letter-spacing: -0.01em; }
-.subtitle { margin: 4px 0 0; font-size: 13px; color: #64748b; }
+.subtitle { margin: 4px 0 0; font-size: 14px; color: #64748b; }
 
 /* Completion progress ring */
 .header-progress { margin-left: auto; flex-shrink: 0; }
@@ -446,9 +446,20 @@ function autoFillDefaults() {
   gap: 20px;
   align-items: stretch;
 }
-/* 双列卡片高度拉齐 */
+/* 双列卡片高度拉齐 + 内部 textarea 撑满 */
 .form-col:not(.wide) .section-card {
   height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.form-col:not(.wide) .card-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.form-col:not(.wide) .form-textarea {
+  flex: 1;
+  resize: none;
 }
 .form-col.wide { grid-column: 1 / -1; }
 
@@ -506,7 +517,7 @@ function autoFillDefaults() {
   background: rgba(16, 185, 129, 0.12);
   border: 1px solid rgba(16, 185, 129, 0.2);
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: #059669;
 }
@@ -516,7 +527,7 @@ function autoFillDefaults() {
   background: rgba(245, 158, 11, 0.12);
   border: 1px solid rgba(245, 158, 11, 0.2);
   border-radius: 999px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   color: #b45309;
 }
@@ -545,7 +556,7 @@ function autoFillDefaults() {
   padding: 10px 14px;
   border: 1px solid rgba(148, 163, 184, 0.3);
   border-radius: 10px;
-  font-size: 13.5px;
+  font-size: 15px;
   font-family: inherit;
   background: rgba(255, 255, 255, 0.6);
   color: #0f172a;
@@ -586,7 +597,7 @@ function autoFillDefaults() {
   gap: 6px;
   padding: 10px 22px;
   border-radius: 10px;
-  font-size: 13.5px;
+  font-size: 14.5px;
   font-weight: 600;
   cursor: pointer;
   transition: all 150ms cubic-bezier(0.16, 1, 0.3, 1);
