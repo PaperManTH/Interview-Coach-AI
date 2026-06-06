@@ -1,5 +1,6 @@
 package com.interviewcoach.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.interviewcoach.entity.ResumeProfile;
@@ -84,15 +85,25 @@ public class ResumeServiceImpl implements ResumeService {
             parsedJson = "{}";
         }
 
-        // 4. 入库
+        // 4. 入库（同一用户覆盖旧记录）
         ResumeProfile profile = new ResumeProfile();
         profile.setUserId(userId);
         profile.setResumeText(resumeText);
         profile.setParsedJson(parsedJson);
         profile.setFileName(file.getOriginalFilename());
-        mapper.insert(profile);
 
-        log.info("[Resume] 入库成功 id={}, userId={}", profile.getId(), userId);
+        // 查旧记录
+        ResumeProfile existing = mapper.selectOne(
+                new LambdaQueryWrapper<ResumeProfile>()
+                        .eq(ResumeProfile::getUserId, userId));
+        if (existing != null) {
+            profile.setId(existing.getId());
+            mapper.updateById(profile);
+            log.info("[Resume] 覆盖更新 id={}, userId={}", existing.getId(), userId);
+        } else {
+            mapper.insert(profile);
+            log.info("[Resume] 新增入库 id={}, userId={}", profile.getId(), userId);
+        }
 
         // 5. 构建响应
         return buildResponse(profile);

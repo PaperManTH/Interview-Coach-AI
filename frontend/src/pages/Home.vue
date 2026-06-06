@@ -5,6 +5,7 @@ import chatPng from '@/assets/chat_icon.png';
 import voicePng from '@/assets/voice_icon.png';
 import toolPng from '@/assets/tool_icon.png';
 import dataPng from '@/assets/data_analysis.png';
+import uploadBtnPng from '@/assets/upload_button_icon.png';
 import heroPng from '@/assets/study_process.png';
 import bgPng from '@/assets/background.png';
 import { ref, onMounted, computed } from 'vue';
@@ -145,9 +146,8 @@ function clearResume() {
               </div>
               <button class="ghost-btn" @click="clearResume" title="移除">✕</button>
             </div>
-            <button v-else class="primary-btn" @click="resumeUpload?.quickUpload()">
-              <span>选择文件</span>
-              <span class="btn-zh">Choose File</span>
+            <button v-else class="upload-btn" @click="resumeUpload?.quickUpload()">
+              <img :src="uploadBtnPng" class="upload-btn-icon" alt="上传简历" />
             </button>
           </div>
         </div>
@@ -457,25 +457,31 @@ function clearResume() {
 .resume-sub   { font-size: 13px; color: #475569; }
 
 .resume-action { display: flex; align-items: center; gap: 10px; }
-.primary-btn {
+.upload-btn {
   display: inline-flex;
-  flex-direction: column;
   align-items: center;
-  gap: 2px;
-  padding: 12px 24px;
-  background: linear-gradient(135deg, #1e40af, #1e3a5f);
-  color: #fff;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
   border: none;
-  border-radius: 12px;
-  font-size: 14px;
-  font-weight: 700;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(30, 64, 175, 0.3);
-  transition: all 180ms;
-  line-height: 1.1;
+  transition: all 200ms cubic-bezier(0.16, 1, 0.3, 1);
 }
-.primary-btn .btn-zh { font-size: 11px; opacity: 0.85; font-weight: 500; }
-.primary-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(30, 64, 175, 0.4); }
+.upload-btn-icon {
+  height: 52px;
+  width: auto;
+  display: block;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 12px rgba(30, 64, 175, 0.3));
+  transition: all 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.upload-btn:hover .upload-btn-icon {
+  transform: translateY(-2px);
+  filter: drop-shadow(0 6px 18px rgba(30, 64, 175, 0.45));
+}
+.upload-btn:active .upload-btn-icon {
+  transform: translateY(0);
+}
 
 .resume-info {
   display: flex;
