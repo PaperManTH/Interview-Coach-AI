@@ -8,19 +8,19 @@ const store = useInterviewStore();
 
 const label = computed(() => {
   switch (props.status) {
-    case 'thinking':   return 'Thinking…';
-    case 'speaking':   return 'Speaking…';
-    case 'listening':  return 'Listening…';
-    case 'processing': return 'Processing…';
+    case 'thinking':   return 'Thinking';
+    case 'speaking':   return 'Speaking';
+    case 'listening':  return 'Listening';
+    case 'processing': return 'Processing';
     default:           return 'Ready';
   }
 });
 
 const zhLabel = computed(() => {
   switch (props.status) {
-    case 'thinking':   return '正在思考';
-    case 'speaking':   return '正在说话';
-    case 'listening':  return '正在聆听';
+    case 'thinking':   return '思考中';
+    case 'speaking':   return '说话中';
+    case 'listening':  return '聆听中';
     case 'processing': return '处理中';
     default:           return '就绪';
   }
@@ -40,9 +40,9 @@ const color = computed(() => {
 <template>
   <div class="status-bar">
     <div class="status-left">
-      <span class="status-dot" :style="{ background: color }" />
+      <span class="status-dot" :style="{ background: color, boxShadow: `0 0 0 4px ${color}20` }" />
       <div class="status-texts">
-        <span class="status-label">{{ label }}</span>
+        <span class="status-en">{{ label }}</span>
         <span class="status-zh">{{ zhLabel }}</span>
       </div>
     </div>
@@ -50,11 +50,11 @@ const color = computed(() => {
     <div class="status-right">
       <span class="chip" :class="{ connected: store.isWsConnected, disconnected: !store.isWsConnected }">
         <span class="chip-dot"></span>
-        <span>{{ store.isWsConnected ? 'Connected' : 'Disconnected' }}</span>
+        {{ store.isWsConnected ? '已连接' : '已断开' }}
       </span>
-      <span v-if="isMicActive" class="chip mic">
+      <span v-if="isMicActive" class="chip mic-on">
         <span class="chip-dot"></span>
-        Mic On
+        麦克风
       </span>
     </div>
   </div>
@@ -65,57 +65,72 @@ const color = computed(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 24px;
-  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-  border-top: 1px solid #f1f5f9;
+  padding: 8px 24px;
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(4px);
+  border-top: 1px solid rgba(148, 163, 184, 0.1);
   font-size: 13px;
+  flex-shrink: 0;
 }
-.status-left { display: flex; align-items: center; gap: 10px; }
-.status-dot {
-  width: 8px; height: 8px; border-radius: 50%;
-  box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 15%, transparent);
-  animation: pulse 1.4s infinite ease-in-out;
-}
-.status-texts { display: flex; flex-direction: column; gap: 1px; line-height: 1.2; }
-.status-label { font-size: 12px; font-weight: 700; color: #0f172a; letter-spacing: 0.04em; text-transform: uppercase; }
-.status-zh    { font-size: 11px; color: #94a3b8; }
 
-.status-right { display: flex; align-items: center; gap: 8px; }
+.status-left { display: flex; align-items: center; gap: 9px; }
+.status-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  animation: status-pulse 1.6s infinite ease-in-out;
+}
+.status-texts { display: flex; align-items: baseline; gap: 6px; }
+.status-en {
+  font-size: 11px;
+  font-weight: 700;
+  color: #334155;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.status-zh {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.status-right { display: flex; align-items: center; gap: 6px; }
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
+  gap: 5px;
+  padding: 3px 9px;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 600;
-  background: #f1f5f9;
+  background: rgba(241, 245, 249, 0.6);
   color: #64748b;
+  backdrop-filter: blur(2px);
 }
 .chip-dot {
-  width: 6px; height: 6px; border-radius: 50%;
+  width: 5px; height: 5px; border-radius: 50%;
   background: currentColor;
   opacity: 0.7;
 }
 .chip.connected {
-  background: #dcfce7;
-  color: #15803d;
+  background: rgba(16, 185, 129, 0.1);
+  color: #059669;
 }
 .chip.disconnected {
-  background: #fee2e2;
-  color: #b91c1c;
+  background: rgba(239, 68, 68, 0.08);
+  color: #dc2626;
 }
 .chip.disconnected .chip-dot { animation: blink 1s infinite; }
-.chip.mic {
-  background: #dbeafe;
-  color: #1d4ed8;
+.chip.mic-on {
+  background: rgba(59, 130, 246, 0.1);
+  color: #2563eb;
 }
 
-@keyframes pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.45; transform: scale(1.2); } }
+@keyframes status-pulse {
+  0%,100% { opacity: 1; transform: scale(1); }
+  50%     { opacity: 0.4; transform: scale(1.3); }
+}
 @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
 
 @media (max-width: 640px) {
-  .status-bar { padding: 10px 16px; }
+  .status-bar { padding: 8px 16px; }
   .status-zh { display: none; }
 }
 </style>

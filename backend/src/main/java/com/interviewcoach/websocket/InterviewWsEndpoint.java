@@ -305,7 +305,7 @@ public class InterviewWsEndpoint {
                 .type(MessageType.TEXT)
                 .sender("system")
                 .receiver(userId)
-                .content("连接成功！欢迎使用面试教练 AI，请问有什么可以帮助你的？")
+                .content("连接成功！欢迎使用 Interview Coach")
                 .timestamp(System.currentTimeMillis())
                 .sessionId(session.getId())
                 .build());
