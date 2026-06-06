@@ -18,7 +18,7 @@
         <!-- ====== LLM 配置 ====== -->
         <div class="section-card">
           <div class="card-header">
-            <div class="card-icon ai-icon">🤖</div>
+            <div class="card-icon ai-icon"><img :src="aiPng" alt="" /></div>
             <div class="card-title-group">
               <div class="card-title">大语言模型 (LLM)</div>
               <span v-if="hasLlmConfig" class="configured-badge">已配置</span>
@@ -65,7 +65,7 @@
         <!-- ====== ASR 配置 ====== -->
         <div class="section-card">
           <div class="card-header">
-            <div class="card-icon voice-icon">🎙️</div>
+            <div class="card-icon voice-icon"><img :src="voicePng" alt="" /></div>
             <div class="card-title-group">
               <div class="card-title">语音识别 (ASR)</div>
               <span v-if="hasAsrConfig" class="configured-badge">已配置</span>
@@ -102,7 +102,7 @@
         <!-- ====== TTS 配置 ====== -->
         <div class="section-card">
           <div class="card-header">
-            <div class="card-icon sound-icon">🔊</div>
+            <div class="card-icon sound-icon"><img :src="soundPng" alt="" /></div>
             <div class="card-title-group">
               <div class="card-title">语音合成 (TTS)</div>
               <span v-if="hasTtsConfig" class="configured-badge">已配置</span>
@@ -149,7 +149,7 @@
       <div class="sidebar-section">
         <div class="section-card quick-info">
           <div class="card-header">
-            <div class="card-icon info-icon">💡</div>
+            <div class="card-icon info-icon"><img :src="infoPng" alt="" /></div>
             <div class="card-title">温馨提示</div>
           </div>
           <div class="card-body tips-list">
@@ -174,7 +174,7 @@
 
         <div class="section-card status-card">
           <div class="card-header">
-            <div class="card-icon status-icon">📊</div>
+            <div class="card-icon status-icon"><img :src="statusPng" alt="" /></div>
             <div class="card-title">配置状态</div>
           </div>
           <div class="card-body status-list">
@@ -210,6 +210,11 @@
 </template>
 
 <script setup lang="ts">
+import aiPng from '@/assets/chat_icon.png';
+import voicePng from '@/assets/voice_icon.png';
+import soundPng from '@/assets/tool_icon.png';
+import infoPng from '@/assets/data_analysis.png';
+import statusPng from '@/assets/study_process.png';
 import { ref, reactive, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/authStore';
@@ -468,7 +473,15 @@ async function saveSettings() {
   align-items: center;
   justify-content: center;
   font-size: 16px;
+  padding: 6px;
   flex-shrink: 0;
+  box-sizing: border-box;
+}
+.card-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
 }
 .ai-icon { background: linear-gradient(135deg, #fef3c7, #fde68a); }
 .voice-icon { background: linear-gradient(135deg, #dbeafe, #bfdbfe); }

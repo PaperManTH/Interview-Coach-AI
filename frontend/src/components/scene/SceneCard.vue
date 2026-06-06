@@ -12,66 +12,111 @@ function goInterview() {
 </script>
 
 <template>
-  <button class="card" :style="{ borderColor: scene.accent }" @click="goInterview">
-    <div class="icon" :style="{ background: scene.accent }">{{ scene.icon }}</div>
-    <h3>
-      <BilingualText :en="scene.title" :zh="scene.titleZh" />
-    </h3>
+  <button
+    class="scene-card"
+    :style="{ '--accent': scene.accent }"
+    @click="goInterview"
+    type="button"
+  >
+    <div class="top-row">
+      <div class="icon-wrap">
+        <img class="icon" :src="scene.icon" alt="" />
+      </div>
+      <span class="key-tag">{{ scene.key.toUpperCase() }}</span>
+    </div>
+
+    <div class="title">
+      <BilingualText :en="scene.title" :zh="scene.titleZh" size="lg" />
+    </div>
+
     <p class="desc">
-      <BilingualText :en="scene.description" :zh="scene.descriptionZh" />
+      <BilingualText :en="scene.description" :zh="scene.descriptionZh" size="base" />
     </p>
-    <span class="cta" :style="{ color: scene.accent }">
-      <span class="cta-en">Start</span>
-      <span class="cta-zh">开始</span>
-      <span class="arrow">→</span>
-    </span>
+
+    <div class="cta-row">
+      <span class="cta">
+        <span class="cta-text">Start</span>
+        <span class="cta-zh">开始</span>
+        <span class="arrow">→</span>
+      </span>
+    </div>
   </button>
 </template>
 
 <style scoped>
-.card {
+.scene-card {
+  --card-pad: 24px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: var(--card-pad);
   text-align: left;
   background: #fff;
-  border: 2px solid transparent;
-  border-radius: 18px;
-  padding: 22px;
+  border: 1px solid var(--border-light, #e2e8f0);
+  border-radius: var(--radius-lg, 16px);
+  box-shadow: var(--shadow-sm, 0 1px 3px rgba(15,23,42,0.06));
   cursor: pointer;
-  transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
-  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+  transition: all 240ms cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
   font-family: inherit;
 }
-.card:hover {
+.scene-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent), transparent);
+  opacity: 0;
+  transition: opacity 240ms;
+}
+.scene-card:hover {
   transform: translateY(-3px);
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 12px 28px -8px rgba(15, 23, 42, 0.12), 0 4px 10px -4px rgba(15, 23, 42, 0.06);
+  border-color: var(--accent);
+}
+.scene-card:hover::before { opacity: 1; }
+
+.top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.icon-wrap {
+  width: 52px; height: 52px;
+  border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, var(--accent) 14%, #fff);
+  transition: all 240ms;
+}
+.scene-card:hover .icon-wrap {
+  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 70%, #000));
 }
 .icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font-size: 22px;
-  margin-bottom: 14px;
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  display: block;
+  transition: transform 240ms;
 }
-h3 { 
-  margin: 0 0 12px; 
-}
-h3 :deep(.en) {
-  font-size: 18px;
+.scene-card:hover .icon { transform: scale(1.08); }
+
+.key-tag {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
   font-weight: 700;
-  color: #0f172a;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, #fff);
 }
-h3 :deep(.zh) {
-  font-size: 13px;
-  color: #64748b;
-}
-.desc { 
-  margin: 0 0 18px; 
-}
+
+.title :deep(.en) { font-size: 19px; font-weight: 700; color: #0f172a; }
+.title :deep(.zh) { font-size: 13px; color: #475569; }
+
+.desc { margin: 0; flex: 1; }
 .desc :deep(.en) {
-  font-size: 13.5px;
+  font-size: 14px;
   color: #475569;
   line-height: 1.55;
 }
@@ -79,22 +124,20 @@ h3 :deep(.zh) {
   font-size: 12px;
   color: #94a3b8;
 }
-.cta { 
-  display: flex;
+
+.cta-row { margin-top: auto; padding-top: 8px; border-top: 1px solid #f1f5f9; }
+.cta {
+  display: inline-flex;
   align-items: center;
-  gap: 4px;
-  font-size: 13px;
+  gap: 6px;
+  color: var(--accent);
   font-weight: 700;
+  font-size: 14px;
 }
-.cta-en {
-  color: inherit;
-}
-.cta-zh {
-  font-size: 12px;
-  opacity: 0.8;
-  color: inherit;
-}
+.cta-zh { font-size: 12px; opacity: 0.8; font-weight: 500; }
 .arrow {
-  margin-left: 2px;
+  margin-left: 4px;
+  transition: transform 200ms;
 }
+.scene-card:hover .arrow { transform: translateX(4px); }
 </style>

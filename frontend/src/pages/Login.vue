@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import logoPng from '@/assets/logo.png';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/authStore';
 
@@ -14,7 +15,7 @@ function handleLogin() {
   <div class="login-page">
     <div class="login-card">
       <div class="logo-section">
-        <span class="logo-icon">🎯</span>
+        <img :src="logoPng" class="logo-icon" alt="logo" />
         <h1>Interview Coach AI</h1>
         <p class="subtitle">AI 面试教练 · 实时英语面试练习</p>
       </div>
@@ -52,7 +53,14 @@ function handleLogin() {
   box-shadow: 0 8px 24px rgba(0,0,0,0.3);
 }
 .logo-section { margin-bottom: 36px; }
-.logo-icon { font-size: 48px; display: block; margin-bottom: 16px; }
+.logo-icon {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto 16px;
+  border-radius: 16px;
+}
 h1 { color: #f0f6fc; font-size: 22px; margin: 0 0 8px; }
 .subtitle { color: #8b949e; font-size: 14px; margin: 0; }
 
