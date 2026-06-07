@@ -2,6 +2,10 @@ package com.interviewcoach.service;
 
 import com.interviewcoach.config.ChatModelConfig;
 import com.interviewcoach.entity.UserProviderConfig;
+import com.interviewcoach.mapper.ResumeProfileMapper;
+import com.interviewcoach.entity.ResumeProfile;
+import com.interviewcoach.entity.dto.ai.BilingualResponse;
+import com.interviewcoach.utils.BilingualResponseParser;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.messages.Message;
@@ -21,7 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * AI 服务 - 通过 Spring AI ChatModel 调用 LLM。
- * 优先使用用户个人配置，没配则默认 Mock。
+ * 支持动态面试模式的阶段感知 Prompt 策略。
  */
 @Slf4j
 @Service
@@ -33,21 +37,108 @@ public class SpringAiService {
     @Autowired
     private UserConfigService userConfigService;
 
+    @Autowired(required = false)
+    private ResumeProfileMapper resumeProfileMapper;
+
+    @Autowired
+    private ChatModelConfig chatModelConfig;
+
     /** 缓存用户 ChatModel，避免每次请求都创建 */
     private final ConcurrentHashMap<String, ChatModel> userModelCache = new ConcurrentHashMap<>();
 
-    private static final String SYSTEM_PROMPT =
-            "你是一个专业的面试教练助手，帮助用户准备面试，回答面试相关问题。语言用中文。";
-
     public String chat(String message) {
-        return internalChat(message, SYSTEM_PROMPT);
+        return internalChat(message, chatModelConfig.getSystemPrompt());
+    }
+
+    public String chat(String userId, String message) {
+        return internalChatWithUser(userId, message, chatModelConfig.getSystemPrompt());
     }
 
     /**
-     * 使用用户个人配置的 ChatModel
+     * 动态模式：带阶段信息的聊天
      */
-    public String chat(String userId, String message) {
-        return internalChatWithUser(userId, message, SYSTEM_PROMPT);
+    public String chatDynamic(String userId, String message, String stage, String focus) {
+        String systemPrompt = buildDynamicSystemPrompt(userId, stage, focus);
+        log.info("[AI-Dynamic] userId={}, stage={}, focus={}", userId, stage, focus);
+        return internalChatWithUser(userId, message, systemPrompt);
+    }
+
+    /**
+     * 动态模式：带阶段信息的聊天，返回双语响应
+     */
+    public BilingualResponse chatDynamicBilingual(String userId, String message, String stage, String focus) {
+        String rawResponse = chatDynamic(userId, message, stage, focus);
+        BilingualResponse response = BilingualResponseParser.parse(rawResponse);
+
+        if (response == null || !response.isValid()) {
+            log.warn("[AI-Bilingual] 响应非标准 JSON，包装为双语文本");
+            String safeText = (rawResponse == null || rawResponse.isBlank()) ? "Let's continue the interview." : rawResponse;
+            String english = safeText.substring(0, Math.min(500, safeText.length()));
+            return new BilingualResponse(safeText, english);
+        }
+
+        log.info("[AI-Bilingual] 解析成功，中文长度={}，英文长度={}",
+                response.getChinese().length(), response.getEnglish().length());
+        return response;
+    }
+
+    /**
+     * 普通聊天，返回双语响应
+     */
+    public BilingualResponse chatBilingual(String userId, String message) {
+        String rawResponse = chat(userId, message);
+        BilingualResponse response = BilingualResponseParser.parse(rawResponse);
+
+        if (response == null || !response.isValid()) {
+            log.warn("[AI-Bilingual] 响应非标准 JSON，包装为双语文本");
+            String safeText = (rawResponse == null || rawResponse.isBlank()) ? "Let's continue the interview." : rawResponse;
+            String english = safeText.substring(0, Math.min(500, safeText.length()));
+            return new BilingualResponse(safeText, english);
+        }
+
+        return response;
+    }
+
+    private String buildDynamicSystemPrompt(String userId, String stage, String focus) {
+        String basePrompt = chatModelConfig.getPromptByStage(stage);
+        
+        if ("technical".equals(stage)) {
+            basePrompt = buildTechnicalPrompt(basePrompt, userId, focus);
+        }
+
+        return basePrompt + "\n\n当前阶段：" + stage + " | 面试重点：" + focus;
+    }
+
+    private String buildTechnicalPrompt(String basePrompt, String userId, String focus) {
+        StringBuilder prompt = new StringBuilder(basePrompt);
+
+        if ("resume".equals(focus) && resumeProfileMapper != null && userId != null) {
+            try {
+                List<ResumeProfile> profiles = resumeProfileMapper.selectList(
+                        new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ResumeProfile>()
+                                .eq(ResumeProfile::getUserId, userId)
+                                .orderByDesc(ResumeProfile::getId)
+                                .last("LIMIT 1")
+                );
+                if (!profiles.isEmpty() && profiles.get(0).getParsedJson() != null) {
+                    String resumeContext = profiles.get(0).getParsedJson();
+                    if (resumeContext.length() > 2000) {
+                        resumeContext = resumeContext.substring(0, 2000) + "...";
+                    }
+                    prompt.append("\n\n【候选人简历信息】\n").append(resumeContext);
+                    prompt.append("\n\n请基于以上简历信息，针对性地提出技术问题。");
+                    log.info("[AI-Dynamic] 已加载用户 {} 的简历上下文", userId);
+                }
+            } catch (Exception e) {
+                log.warn("[AI-Dynamic] 加载简历失败: {}", e.getMessage());
+            }
+        } else if ("technical".equals(focus)) {
+            prompt.append("\n\n聚焦于纯技术深度，覆盖：算法与数据结构、系统设计、编程语言原理、数据库优化、分布式系统。");
+        } else {
+            prompt.append("\n\n通用技术面试，平衡覆盖：项目经验、技术栈、系统设计、问题解决能力。");
+        }
+
+        return prompt.toString();
     }
 
     public String chatWithSystem(String systemMessage, String userMessage) {
@@ -90,17 +181,26 @@ public class SpringAiService {
             log.info("[AI] 响应长度: {} chars", content.length());
             return content;
         } catch (Exception e) {
-            log.error("[AI] ChatModel 调用失败: {}", e.getMessage());
-            return "抱歉，AI 服务暂时不可用：" + e.getMessage();
+            // ===== 识别常见的 provider 错误并给出友好降级 =====
+            String rawMsg = e.getMessage() == null ? "unknown error" : e.getMessage();
+            String lowerMsg = rawMsg.toLowerCase();
+
+            // 402 余额不足 / 429 限流 / 401 未授权
+            if (rawMsg.startsWith("402") || lowerMsg.contains("insufficient balance") || lowerMsg.contains("quota")) {
+                log.error("[AI] Provider 余额不足 (402), 降级到模拟回复: {}", rawMsg);
+            } else if (rawMsg.startsWith("429") || lowerMsg.contains("rate limit") || lowerMsg.contains("too many")) {
+                log.error("[AI] Provider 限流 (429), 降级到模拟回复: {}", rawMsg);
+            } else if (rawMsg.startsWith("401") || rawMsg.startsWith("403") || lowerMsg.contains("unauthorized") || lowerMsg.contains("invalid api")) {
+                log.error("[AI] Provider 鉴权失败 (401/403), 降级到模拟回复: {}", rawMsg);
+            } else {
+                log.error("[AI] ChatModel 调用失败: {}", rawMsg);
+            }
+
+            // 全部降级到 mock 回复，避免阻断用户体验
+            return mock(userMessage);
         }
     }
 
-    /**
-     * 解析 ChatModel 的优先级：
-     * 1. 用户个人配置（从 DB 读取）→ 缓存
-     * 2. 全局 ChatModel（从 application.yml）
-     * 3. null → Mock
-     */
     private ChatModel resolveChatModel(String userId) {
         if (userId != null) {
             ChatModel cached = userModelCache.get(userId);
@@ -112,7 +212,7 @@ public class SpringAiService {
                 return userModel;
             }
         }
-        return chatModel; // null = Mock
+        return chatModel;
     }
 
     private ChatModel buildUserChatModel(String userId) {

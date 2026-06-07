@@ -11,6 +11,12 @@ export interface ChatMessage {
   createdAt: number;
   streaming?: boolean; // 流式输出中
   isVoice?: boolean;   // 是否来自语音识别
+  isSystem?: boolean;  // 系统过渡消息（如阶段切换）
+  stageInfo?: {        // 动态模式下附加的阶段信息
+    stage: string;
+    label: string;
+    labelZh: string;
+  };
 }
 
 // 会话状态：idle / listening（录音中）/ thinking（生成中）/ speaking（TTS 播放中）/ processing（处理中）

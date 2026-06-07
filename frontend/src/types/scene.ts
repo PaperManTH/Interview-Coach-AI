@@ -8,6 +8,68 @@ import pressureIcon from '@/assets/tool_icon.png';
 
 export type InterviewSceneKey = 'hr' | 'technical' | 'pressure';
 
+// ===== 动态面试模式类型 =====
+
+/** 动态面试阶段 */
+export type InterviewStage = 'warmup' | 'technical' | 'pressure';
+
+/** 面试聚焦方向（用户在首页选择） */
+export type InterviewFocus = 'general' | 'resume' | 'technical';
+
+export interface InterviewStageMeta {
+  key: InterviewStage;
+  label: string;        // 英文标签
+  labelZh: string;      // 中文标签
+  description: string;  // 英文描述
+  descriptionZh: string;// 中文描述
+  accent: string;       // CSS 色值
+  icon: string;         // 图标
+}
+
+/** 动态面试三阶段定义 */
+export const INTERVIEW_STAGES: InterviewStageMeta[] = [
+  {
+    key: 'warmup',
+    label: 'Warm-up',
+    labelZh: '热身环节',
+    description: 'Self-introduction & behavioral questions',
+    descriptionZh: '自我介绍与行为问题',
+    accent: '#2563eb',
+    icon: hrIcon
+  },
+  {
+    key: 'technical',
+    label: 'Technical',
+    labelZh: '技术深挖',
+    description: 'Deep technical questions based on your background',
+    descriptionZh: '基于背景的技术深度提问',
+    accent: '#0ea5e9',
+    icon: techIcon
+  },
+  {
+    key: 'pressure',
+    label: 'Challenge',
+    labelZh: '压力挑战',
+    description: 'High-stakes follow-ups & edge cases',
+    descriptionZh: '高压追问与极端场景',
+    accent: '#f97316',
+    icon: pressureIcon
+  }
+];
+
+/** 面试焦点选项 */
+export const INTERVIEW_FOCUS_OPTIONS: { value: InterviewFocus; label: string; labelZh: string; desc: string }[] = [
+  { value: 'general', label: 'General', labelZh: '通用', desc: 'Balanced interview covering all areas' },
+  { value: 'resume', label: 'Resume-based', labelZh: '基于简历', desc: 'Questions tailored to your resume' },
+  { value: 'technical', label: 'Technical', labelZh: '技术专项', desc: 'Focus on technical depth' }
+];
+
+export function getStageMeta(key: string | undefined): InterviewStageMeta | undefined {
+  return INTERVIEW_STAGES.find((s) => s.key === key);
+}
+
+// ===== 原有场景类型（保留兼容） =====
+
 export interface InterviewSceneMeta {
   key: InterviewSceneKey;
   title: string;           // 英文标题

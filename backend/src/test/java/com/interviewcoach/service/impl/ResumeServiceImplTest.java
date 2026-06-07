@@ -5,7 +5,7 @@ import com.interviewcoach.entity.dto.resume.ResumeResponse;
 import com.interviewcoach.exception.FileUploadException;
 import com.interviewcoach.mapper.ResumeProfileMapper;
 import com.interviewcoach.service.SpringAiService;
-import com.interviewcoach.util.ResumeParserUtils;
+import com.interviewcoach.utils.ResumeParserUtils;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

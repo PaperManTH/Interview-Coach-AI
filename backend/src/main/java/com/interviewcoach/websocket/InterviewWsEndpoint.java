@@ -1,11 +1,12 @@
 package com.interviewcoach.websocket;
 
+import com.interviewcoach.entity.dto.ai.BilingualResponse;
 import com.interviewcoach.entity.dto.websocket.MessageDTO;
 import com.interviewcoach.entity.dto.websocket.MessageType;
 import com.interviewcoach.service.AsrService;
 import com.interviewcoach.service.SpringAiService;
 import com.interviewcoach.service.TtsService;
-import com.interviewcoach.util.MessageCodec;
+import com.interviewcoach.utils.MessageCodec;
 
 import jakarta.websocket.*;
 import jakarta.websocket.server.ServerEndpoint;
@@ -15,6 +16,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Base64;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -138,23 +141,34 @@ public class InterviewWsEndpoint {
                 .build();
         sendMessage(session, userMsg);
 
-        // 2. 生成 AI 回复
-        String aiResponse = callAiService(userId, userMessage);
+        // 2. 生成 AI 双语回复（传递原始 msg 以提取动态模式 metadata）
+        BilingualResponse aiResponse = callAiServiceBilingual(userId, userMessage, msg);
+
+        // 3. 构建双语消息发送给前端
+        Map<String, Object> bilingualContent = new HashMap<>();
+        bilingualContent.put("chinese", aiResponse.getChinese());
+        bilingualContent.put("english", aiResponse.getEnglish());
 
         MessageDTO reply = MessageDTO.builder()
                 .id(UUID.randomUUID().toString())
                 .type(MessageType.TEXT)
                 .sender("assistant")
                 .receiver(msg.getSender())
-                .content(aiResponse)
+                .content(aiResponse.getFormattedText())  // 兼容旧客户端，显示双语文本
                 .timestamp(System.currentTimeMillis())
                 .sessionId(session.getId())
+                .metadata(bilingualContent)  // 新客户端可以使用结构化数据
                 .build();
         sendMessage(session, reply);
         sendMessage(session, MessageDTO.ack(msg.getId()));
 
-        // 3. TTS 语音合成（异步，不阻塞回复）
-        synthesizeAndSend(session, userId, aiResponse);
+        // 4. TTS 语音合成（仅处理英文部分，过滤疑似降级/错误提示）
+        String englishText = aiResponse.getEnglish();
+        if (shouldSkipTts(englishText)) {
+            log.debug("[WS-TTS] 跳过语音合成（响应疑似降级/错误提示）");
+        } else {
+            synthesizeAndSend(session, userId, englishText);
+        }
     }
 
     private void handleVoiceStart(Session session, MessageDTO msg) {
@@ -246,21 +260,32 @@ public class InterviewWsEndpoint {
                 .build();
         sendMessage(session, voiceTextMsg);
 
-        // 2. 生成 AI 回复
-        String aiResponse = callAiService(userId, voiceText);
+        // 2. 生成 AI 双语回复（传递原始 msg 以提取动态模式 metadata）
+        BilingualResponse aiResponse = callAiServiceBilingual(userId, voiceText, msg);
+
+        // 3. 构建双语消息发送给前端
+        Map<String, Object> bilingualContent = new HashMap<>();
+        bilingualContent.put("chinese", aiResponse.getChinese());
+        bilingualContent.put("english", aiResponse.getEnglish());
 
         MessageDTO reply = MessageDTO.builder()
                 .id(UUID.randomUUID().toString())
                 .type(MessageType.TEXT)
                 .sender("assistant")
-                .content(aiResponse)
+                .content(aiResponse.getFormattedText())  // 兼容旧客户端
                 .timestamp(System.currentTimeMillis())
                 .sessionId(session.getId())
+                .metadata(bilingualContent)  // 新客户端可以使用结构化数据
                 .build();
         sendMessage(session, reply);
 
-        // 3. TTS
-        synthesizeAndSend(session, userId, aiResponse);
+        // 4. TTS（仅处理英文部分，过滤疑似降级/错误提示）
+        String englishText = aiResponse.getEnglish();
+        if (shouldSkipTts(englishText)) {
+            log.debug("[WS-TTS] 跳过语音合成（响应疑似降级/错误提示）");
+        } else {
+            synthesizeAndSend(session, userId, englishText);
+        }
     }
 
     private void handleAck(Session session, MessageDTO msg) {
@@ -268,15 +293,67 @@ public class InterviewWsEndpoint {
     }
 
     private String callAiService(String userId, String message) {
+        return callAiService(userId, message, null);
+    }
+
+    /**
+     * 调用 AI 服务，支持动态模式（带阶段信息）。
+     * @param userId 用户 ID
+     * @param message 用户消息
+     * @param msg 原始 MessageDTO（用于提取 metadata 中的阶段信息），可为 null
+     */
+    private String callAiService(String userId, String message, MessageDTO msg) {
         if (springAiService == null) {
             log.warn("[WS] SpringAiService 未初始化，使用模拟回复");
             return "模拟回复：" + message;
         }
         try {
+            // 检查是否为动态模式
+            if (msg != null && msg.getMetadata() != null) {
+                Object modeObj = msg.getMetadata().get("mode");
+                if ("dynamic".equals(modeObj)) {
+                    String stage = String.valueOf(msg.getMetadata().getOrDefault("stage", "warmup"));
+                    String focus = String.valueOf(msg.getMetadata().getOrDefault("focus", "general"));
+                    log.info("[WS-Dynamic] 检测到动态模式, stage={}, focus={}", stage, focus);
+                    return springAiService.chatDynamic(userId, message, stage, focus);
+                }
+            }
+            // 传统模式
             return springAiService.chat(userId, message);
         } catch (Exception e) {
             log.error("[WS] AI 服务调用失败", e);
             return "抱歉，服务暂时不可用";
+        }
+    }
+
+    /**
+     * 调用 AI 服务并返回双语响应。
+     * @param userId 用户 ID
+     * @param message 用户消息
+     * @param msg 原始 MessageDTO（用于提取 metadata 中的阶段信息），可为 null
+     * @return BilingualResponse 双语响应对象
+     */
+    private BilingualResponse callAiServiceBilingual(String userId, String message, MessageDTO msg) {
+        if (springAiService == null) {
+            log.warn("[WS] SpringAiService 未初始化，使用模拟回复");
+            return new BilingualResponse("模拟回复：" + message, "Mock response: " + message);
+        }
+        try {
+            // 检查是否为动态模式
+            if (msg != null && msg.getMetadata() != null) {
+                Object modeObj = msg.getMetadata().get("mode");
+                if ("dynamic".equals(modeObj)) {
+                    String stage = String.valueOf(msg.getMetadata().getOrDefault("stage", "warmup"));
+                    String focus = String.valueOf(msg.getMetadata().getOrDefault("focus", "general"));
+                    log.info("[WS-Dynamic] 检测到动态模式, stage={}, focus={}", stage, focus);
+                    return springAiService.chatDynamicBilingual(userId, message, stage, focus);
+                }
+            }
+            // 传统模式
+            return springAiService.chatBilingual(userId, message);
+        } catch (Exception e) {
+            log.error("[WS] AI 服务调用失败", e);
+            return new BilingualResponse("抱歉，服务暂时不可用", "Sorry, service is temporarily unavailable");
         }
     }
 
@@ -309,6 +386,30 @@ public class InterviewWsEndpoint {
                 .timestamp(System.currentTimeMillis())
                 .sessionId(session.getId())
                 .build());
+    }
+
+    /**
+     * 发送阶段切换通知（动态面试模式）。
+     * 前端收到后会自动推进到下一阶段。
+     */
+    private void sendStageTransition(Session session, String nextStage, String transitionMessage) {
+        try {
+            String payload = String.format(
+                    "{\"stage\":\"%s\",\"transitionMessage\":\"%s\"}",
+                    nextStage, transitionMessage != null ? transitionMessage : ""
+            );
+            sendMessage(session, MessageDTO.builder()
+                    .id(UUID.randomUUID().toString())
+                    .type(MessageType.STAGE_TRANSITION)
+                    .sender("system")
+                    .content(payload)
+                    .timestamp(System.currentTimeMillis())
+                    .sessionId(session.getId())
+                    .build());
+            log.info("[WS] 已发送阶段切换通知: stage={}", nextStage);
+        } catch (Exception e) {
+            log.error("[WS] 发送阶段切换通知失败", e);
+        }
     }
 
     private String getUserId(Session session) {
@@ -352,4 +453,17 @@ public class InterviewWsEndpoint {
     }
 
     private static boolean isBlank(String s) { return s == null || s.isBlank(); }
+
+    /**
+     * 判断是否应跳过 TTS 合成：空/空白、短文本（<10）、疑似错误提示。
+     */
+    private static boolean shouldSkipTts(String text) {
+        if (isBlank(text)) return true;
+        if (text.length() < 10) return true;
+        String lower = text.toLowerCase();
+        return lower.contains("sorry")
+                || lower.contains("service")
+                || lower.contains("temporarily")
+                || lower.contains("unavailable");
+    }
 }

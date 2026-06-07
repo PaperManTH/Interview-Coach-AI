@@ -68,19 +68,13 @@ app:
       host: 127.0.0.1
       port: 7890
 
-  # ---- LLM 大语言模型 ----
-  # 所有LLM配置由用户在个人设置中配置，从数据库读取
+  # ---- LLM / TTS / ASR ----
+  # 所有 AI 服务配置由用户在个人设置中配置，从数据库读取
+  # 全局默认使用 Mock 模式（无用户配置时）
   llm:
     provider: mock
-    temperature: 0.7
-
-  # ---- ASR 语音识别 ----
-  # 所有ASR配置由用户在个人设置中配置，从数据库读取
   asr:
     provider: mock
-
-  # ---- TTS 语音合成 ----
-  # 所有TTS配置由用户在个人设置中配置，从数据库读取
   tts:
     provider: mock
 

@@ -1,7 +1,5 @@
 package com.interviewcoach.service;
 
-import com.interviewcoach.config.AsrProperties;
-import com.interviewcoach.config.AsrProperties.AsrProviderConfig;
 import com.interviewcoach.entity.UserProviderConfig;
 import com.interviewcoach.provider.IflytekAsrProvider;
 
@@ -21,7 +19,9 @@ import java.util.UUID;
 
 /**
  * ASR 语音识别服务。
- * 优先用户个人配置 → YML 全局配置 → Mock。
+ * 
+ * 配置来源：用户个人配置（UserProviderConfig）
+ * 默认模式：Mock（无用户配置时）
  */
 @Slf4j
 @Service
@@ -30,108 +30,73 @@ public class AsrService {
     @Autowired
     private UserConfigService userConfigService;
 
-    @Autowired
-    private AsrProperties asrProperties;
-
     private static final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
             .build();
 
     /**
      * 语音转文字。
-     * @param userId 用户ID
-     * @param audioPath 音频文件路径（WAV/MP3 等）
-     * @return 识别文本
      */
     public String transcribe(String userId, Path audioPath) {
         UserProviderConfig userCfg = userConfigService.getConfig(userId);
-        String provider = resolveProvider(userCfg);
-
-        if ("mock".equalsIgnoreCase(provider)) {
+        
+        // 未配置时使用 Mock
+        if (userCfg == null || isBlank(userCfg.getAsrType()) || "mock".equalsIgnoreCase(userCfg.getAsrType())) {
+            log.info("[ASR] Mock 模式（无用户配置）");
             return mockTranscribe(audioPath);
         }
 
-        if ("iflytek".equalsIgnoreCase(provider)) {
-            String userApiKey = userCfg != null ? userCfg.getAsrApiKey() : null;
-            return transcribeWithIflytek(audioPath, userApiKey);
+        if ("iflytek".equalsIgnoreCase(userCfg.getAsrType())) {
+            return transcribeWithIflytek(userCfg, audioPath);
         }
 
-        String apiKey = resolveApiKey(userCfg, provider);
-        if (isBlank(apiKey)) {
-            return mockTranscribe(audioPath);
-        }
-
-        String baseUrl = resolveBaseUrl(userCfg, provider);
-
-        try {
-            return callOpenAiWhisper(baseUrl, apiKey, audioPath);
-        } catch (Exception e) {
-            log.error("[ASR] 调用失败: {}", e.getMessage());
-            return mockTranscribe(audioPath);
-        }
+        // OpenAI Whisper API
+        return transcribeWithWhisper(userCfg, audioPath);
     }
 
-    /**
-     * 语音转文字（使用 YML 全局配置，不传 userId）。
-     */
     public String transcribe(Path audioPath) {
         return transcribe(null, audioPath);
     }
 
     // ========== 讯飞 ASR ==========
 
-    private String transcribeWithIflytek(Path audioPath, String userApiKey) {
-        log.info("[ASR] 使用讯飞听写");
+    private String transcribeWithIflytek(UserProviderConfig userCfg, Path audioPath) {
+        String apiKey = userCfg.getAsrApiKey();
+        if (isBlank(apiKey)) {
+            log.warn("[ASR] 讯飞 API Key 未配置");
+            return mockTranscribe(audioPath);
+        }
+        
         try {
-            IflytekAsrProvider provider = new IflytekAsrProvider(userApiKey);
+            IflytekAsrProvider provider = new IflytekAsrProvider(apiKey);
             String result = provider.transcribe(audioPath);
-            if (result == null || result.isEmpty()) {
-                return "语音识别暂无结果";
-            }
-            return result;
+            return result != null && !result.isEmpty() ? result : "语音识别暂无结果";
         } catch (Exception e) {
             log.error("[ASR] 讯飞识别失败: {}", e.getMessage());
             return mockTranscribe(audioPath);
         }
     }
 
-    // ========== 内部方法 ==========
+    // ========== Whisper API ==========
 
-    private String resolveProvider(UserProviderConfig userCfg) {
-        if (userCfg != null && !isBlank(userCfg.getAsrType())) {
-            return userCfg.getAsrType();
+    private String transcribeWithWhisper(UserProviderConfig userCfg, Path audioPath) {
+        String apiKey = userCfg.getAsrApiKey();
+        String baseUrl = userCfg.getAsrBaseUrl();
+        
+        if (isBlank(apiKey) || isBlank(baseUrl)) {
+            log.warn("[ASR] Whisper API 配置不完整");
+            return mockTranscribe(audioPath);
         }
-        return asrProperties.getProvider();
+
+        try {
+            return callWhisperApi(baseUrl, apiKey, audioPath);
+        } catch (Exception e) {
+            log.error("[ASR] Whisper 调用失败: {}", e.getMessage());
+            return mockTranscribe(audioPath);
+        }
     }
 
-    private String resolveApiKey(UserProviderConfig userCfg, String provider) {
-        if (userCfg != null && !isBlank(userCfg.getAsrApiKey())) {
-            return userCfg.getAsrApiKey();
-        }
-        AsrProviderConfig ymlCfg = switch (provider) {
-            case "openai" -> asrProperties.getOpenai();
-            case "azure" -> asrProperties.getAzure();
-            default -> null;
-        };
-        return ymlCfg != null ? ymlCfg.getApiKey() : null;
-    }
-
-    private String resolveBaseUrl(UserProviderConfig userCfg, String provider) {
-        if (userCfg != null && !isBlank(userCfg.getAsrBaseUrl())) {
-            return userCfg.getAsrBaseUrl();
-        }
-        AsrProviderConfig ymlCfg = switch (provider) {
-            case "openai" -> asrProperties.getOpenai();
-            case "azure" -> asrProperties.getAzure();
-            default -> null;
-        };
-        return ymlCfg != null ? ymlCfg.getBaseUrl() : null;
-    }
-
-    /**
-     * 调用 OpenAI Whisper API。
-     */
-    private String callOpenAiWhisper(String baseUrl, String apiKey, Path audioPath) throws IOException, InterruptedException {
+    private String callWhisperApi(String baseUrl, String apiKey, Path audioPath) throws IOException, InterruptedException {
         String url = baseUrl.replaceAll("/$", "") + "/v1/audio/transcriptions";
         log.info("[ASR] 调用 Whisper API: {}", url);
 
@@ -147,7 +112,6 @@ public class AsrService {
                 .build();
 
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        log.info("[ASR] 响应状态: {}, 内容长度: {}", response.statusCode(), response.body().length());
 
         if (response.statusCode() == 200) {
             return parseWhisperResponse(response.body());
@@ -157,6 +121,10 @@ public class AsrService {
     }
 
     private byte[] buildMultipartBody(String boundary, Path audioPath) throws IOException {
+        if (audioPath == null) {
+            return new byte[0];
+        }
+        
         String filename = audioPath.getFileName().toString();
         String ext = filename.contains(".") ? filename.substring(filename.lastIndexOf(".") + 1) : "wav";
         String mime = switch (ext) {
@@ -176,19 +144,18 @@ public class AsrService {
         String langPart = "--" + boundary + "\r\n"
                 + "Content-Disposition: form-data; name=\"language\"\r\n\r\nzh\r\n";
 
-        byte[] headerBytes = header.getBytes();
-        byte[] modelBytes = modelPart.getBytes();
-        byte[] langBytes = langPart.getBytes();
-        byte[] footerBytes = footer.getBytes();
+        return concatenate(header.getBytes(), fileBytes, modelPart.getBytes(), langPart.getBytes(), footer.getBytes());
+    }
 
-        int total = headerBytes.length + fileBytes.length + modelBytes.length + langBytes.length + footerBytes.length;
+    private byte[] concatenate(byte[]... parts) {
+        int total = 0;
+        for (byte[] part : parts) total += part.length;
         byte[] result = new byte[total];
         int pos = 0;
-        System.arraycopy(headerBytes, 0, result, pos, headerBytes.length); pos += headerBytes.length;
-        System.arraycopy(fileBytes, 0, result, pos, fileBytes.length); pos += fileBytes.length;
-        System.arraycopy(modelBytes, 0, result, pos, modelBytes.length); pos += modelBytes.length;
-        System.arraycopy(langBytes, 0, result, pos, langBytes.length); pos += langBytes.length;
-        System.arraycopy(footerBytes, 0, result, pos, footerBytes.length);
+        for (byte[] part : parts) {
+            System.arraycopy(part, 0, result, pos, part.length);
+            pos += part.length;
+        }
         return result;
     }
 

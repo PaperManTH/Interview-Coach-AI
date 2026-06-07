@@ -11,7 +11,7 @@ import com.interviewcoach.exception.FileUploadException;
 import com.interviewcoach.mapper.ResumeProfileMapper;
 import com.interviewcoach.service.ResumeService;
 import com.interviewcoach.service.SpringAiService;
-import com.interviewcoach.util.ResumeParserUtils;
+import com.interviewcoach.utils.ResumeParserUtils;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

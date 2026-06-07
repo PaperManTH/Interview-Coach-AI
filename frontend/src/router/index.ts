@@ -22,10 +22,16 @@ const routes: RouteRecordRaw[] = [
     meta: { title: 'Logging in...', guest: true },
   },
   {
-    path: '/interview/:scene',
+    path: '/interview/:scene?',
     name: 'Interview',
     component: () => import('@/pages/Interview.vue'),
     meta: { title: 'Interview Session', requiresAuth: true },
+  },
+  {
+    path: '/interview/dynamic',
+    name: 'DynamicInterview',
+    component: () => import('@/pages/Interview.vue'),
+    meta: { title: 'Dynamic Interview', requiresAuth: true },
   },
   {
     path: '/settings',

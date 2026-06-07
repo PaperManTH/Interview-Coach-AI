@@ -2,7 +2,7 @@ package com.interviewcoach.websocket;
 
 import com.interviewcoach.entity.dto.websocket.MessageDTO;
 import com.interviewcoach.entity.dto.websocket.MessageType;
-import com.interviewcoach.util.MessageCodec;
+import com.interviewcoach.utils.MessageCodec;
 
 import jakarta.websocket.Session;
 import lombok.extern.slf4j.Slf4j;

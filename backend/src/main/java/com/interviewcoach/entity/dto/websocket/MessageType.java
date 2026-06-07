@@ -38,5 +38,8 @@ public enum MessageType {
     AUDIO,
 
     /** 语音识别后生成的文字（用户语音的文本结果） */
-    VOICE_TEXT
+    VOICE_TEXT,
+
+    /** 阶段切换通知（动态面试模式） */
+    STAGE_TRANSITION
 }

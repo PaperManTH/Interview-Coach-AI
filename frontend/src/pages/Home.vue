@@ -8,24 +8,28 @@ import dataPng from '@/assets/data_analysis.png';
 import uploadBtnPng from '@/assets/upload_button_icon.png';
 import heroPng from '@/assets/study_process.png';
 import bgPng from '@/assets/background.png';
+import loginIconPng from '@/assets/login_icon.png';
+import flowChartPng from '@/assets/flow_chart.png';
 import { ref, onMounted, computed } from 'vue';
-import { INTERVIEW_SCENES } from '@/types/scene';
-import SceneCard from '@/components/scene/SceneCard.vue';
 import { useRouter } from 'vue-router';
-import BilingualText from '@/components/BilingualText.vue';
 import { useAuthStore } from '@/stores/authStore';
 import ResumeUpload from '@/components/resume/ResumeUpload.vue';
 import type { ResumeResponse } from '@/types/resume';
+import type { InterviewFocus } from '@/types/scene';
+import { INTERVIEW_FOCUS_OPTIONS } from '@/types/scene';
 
 const router = useRouter();
 const auth = useAuthStore();
 
+// 简历
 const resumeUpload = ref<InstanceType<typeof ResumeUpload> | null>(null);
 const resumeResult = ref<ResumeResponse | null>(null);
-
 const resumeName = computed(() => resumeResult.value?.fileName ?? '');
 const resumeSkills = computed(() => resumeResult.value?.parsedData?.skills ?? []);
 const hasResume = computed(() => !!resumeResult.value);
+
+// 面试焦点选择
+const selectedFocus = ref<InterviewFocus>('general');
 
 onMounted(() => {
   try {
@@ -40,6 +44,8 @@ onMounted(() => {
 function onResumeUploaded(payload: { name: string; size: number; result: any }) {
   if (payload.result) {
     resumeResult.value = payload.result as ResumeResponse;
+    // 有简历时自动切换到 resume 模式
+    selectedFocus.value = 'resume';
   }
 }
 
@@ -48,12 +54,19 @@ function clearResume() {
   resumeUpload.value?.clearResult();
   try { localStorage.removeItem('icai:resume-result'); } catch { /* noop */ }
 }
+
+function startInterview() {
+  // 跳转到动态面试页面，携带 focus 参数
+  router.push({
+    name: 'DynamicInterview',
+    query: { focus: selectedFocus.value }
+  });
+}
 </script>
 
 <template>
   <!-- 全宽背景层 -->
   <div class="page-wrapper" :style="{ '--bg-image': `url(${bgPng})` }">
-    <!-- 内容区：居中 + 半透明玻璃态背景，与全宽背景图融合 -->
     <div class="home">
       <header class="nav">
         <div class="logo-wrap">
@@ -83,25 +96,30 @@ function clearResume() {
             <span class="username">{{ auth.username || 'User' }}</span>
             <button class="logout-btn" @click="auth.logout()" title="登出">↩</button>
           </div>
-          <button v-else class="nav-btn primary" @click="router.push('/login')">登录 / Sign In</button>
+          <button v-else class="login-btn-icon" @click="router.push('/login')" title="登录">
+            <img :src="loginIconPng" class="login-btn-icon-img" alt="登录" />
+          </button>
         </nav>
       </header>
 
+      <!-- ===== 主 Hero 区：AI Interview Coach ===== -->
       <section class="hero">
         <div class="hero-tag">
           <span class="tag-dot"></span>
-          <span>Real-time · AI Powered · English</span>
-          <span class="tag-zh">实时对话 · 英语面试</span>
+          <span>Real-time · AI Powered · Dynamic Stages</span>
+          <span class="tag-zh">实时对话 · 动态阶段 · 自然过渡</span>
         </div>
 
         <h1 class="hero-title">
-          <span class="hero-en">Practice Your English Interview</span>
-          <span class="hero-accent">with an AI Coach</span>
+          <span class="hero-main">AI Interview Coach</span>
+          <span class="hero-subtitle">One Interview, Three Natural Stages</span>
         </h1>
         <p class="hero-desc">
-          Sharpen your interviewing skills through natural, real-time conversations.  通过自然、实时的对话来磨练你的英语面试技巧。
+          Experience a real interview flow — from warm-up self-introduction to technical deep-dive and pressure challenges.
+          All in one seamless session.
         </p>
 
+        <!-- 未登录提示 -->
         <div v-if="!auth.isLoggedIn" class="hero-cta">
           <button class="btn-login" @click="router.push('/login')">
             <img :src="heroPng" class="cta-emoji" alt="" />
@@ -109,14 +127,58 @@ function clearResume() {
             <span class="arrow">→</span>
           </button>
         </div>
+
+        <!-- 已登录：Start Interview 主按钮 -->
+        <div v-else class="start-section">
+          <button class="btn-start" @click="startInterview">
+            <span class="btn-start-icon">▶</span>
+            <span class="btn-start-text">Start Interview</span>
+            <span class="btn-start-zh">开始面试</span>
+            <span class="arrow">→</span>
+          </button>
+
+          <!-- Interview Focus 选择 -->
+          <div class="focus-selector">
+            <div class="focus-label">Interview Focus / 面试重点</div>
+            <div class="focus-options">
+              <label
+                v-for="opt in INTERVIEW_FOCUS_OPTIONS"
+                :key="opt.value"
+                class="focus-option"
+                :class="{ active: selectedFocus === opt.value }"
+              >
+                <input
+                  type="radio"
+                  :value="opt.value"
+                  v-model="selectedFocus"
+                  class="focus-radio"
+                />
+                <span class="focus-radio-circle"></span>
+                <div class="focus-info">
+                  <span class="focus-name">{{ opt.label }}</span>
+                  <span class="focus-name-zh">{{ opt.labelZh }}</span>
+                  <span class="focus-desc">{{ opt.desc }}</span>
+                </div>
+              </label>
+            </div>
+          </div>
+        </div>
       </section>
 
+      <!-- 三阶段流程展示 -->
+      <section class="stages-section">
+        <div class="flow-chart-wrap">
+          <img :src="flowChartPng" class="flow-chart-img" alt="Interview Flow" />
+        </div>
+      </section>
+
+      <!-- 特性卡片 -->
       <section class="features">
         <div class="feature-card">
           <div class="feature-icon"><img :src="chatPng" alt="" /></div>
           <div class="feature-text">
-            <h3>Real-time Conversation</h3>
-            <p>实时对话 · 流畅自然的英文面试交流</p>
+            <h3>Dynamic Flow</h3>
+            <p>动态流程 · 三阶段自然递进</p>
           </div>
         </div>
         <div class="feature-card">
@@ -129,26 +191,26 @@ function clearResume() {
         <div class="feature-card">
           <div class="feature-icon"><img :src="toolPng" alt="" /></div>
           <div class="feature-text">
-            <h3>Smart Scenarios</h3>
-            <p>多场景模拟 · HR / 技术 / 压力面试全覆盖</p>
+            <h3>Adaptive Questions</h3>
+            <p>自适应提问 · 根据回答深度调整</p>
           </div>
         </div>
       </section>
 
+      <!-- 简历上传 -->
       <section class="resume-section">
         <div class="resume-card">
           <div class="resume-icon-wrap">
             <img :src="dataPng" class="resume-icon" alt="resume" />
           </div>
           <div class="resume-text">
-            <div class="resume-title">Upload Your Resume</div>
-            <div class="resume-sub">上传简历 · 让 AI 面试官为你量身定制问题</div>
+            <div class="resume-title">Upload Your Resume (Optional)</div>
+            <div class="resume-sub">上传简历（可选）· 让 AI 基于你的经历定制技术问题</div>
           </div>
           <div class="resume-action">
             <div v-if="hasResume" class="resume-info">
               <span class="resume-name" :title="resumeName">{{ resumeName }}</span>
               <span class="resume-meta">解析完成 · 已就绪</span>
-              <!-- 技能标签 -->
               <div v-if="resumeSkills.length" class="resume-skills">
                 <span v-for="s in resumeSkills.slice(0, 5)" :key="s" class="skill-tiny">{{ s }}</span>
                 <span v-if="resumeSkills.length > 5" class="skill-more">+{{ resumeSkills.length - 5 }}</span>
@@ -159,17 +221,6 @@ function clearResume() {
               <img :src="uploadBtnPng" class="upload-btn-icon" alt="上传简历" />
             </button>
           </div>
-        </div>
-      </section>
-
-      <section class="scenario-section">
-        <div class="section-heading">
-          <h2><span class="en">Choose Your Scenario</span><span class="zh">选择面试场景</span></h2>
-          <p class="section-desc">Pick a practice mode below — follow-up questions will automatically adapt to your answers.</p>
-        </div>
-
-        <div class="grid">
-          <SceneCard v-for="scene in INTERVIEW_SCENES" :key="scene.key" :scene="scene" />
         </div>
       </section>
 
@@ -187,23 +238,18 @@ function clearResume() {
 /* ============ 全宽背景层 ============ */
 .page-wrapper {
   min-height: 100vh;
-  background:
-    var(--bg-image) center center / cover no-repeat fixed;
-  /* 底部加渐变叠加，使内容区与背景自然过渡 */
-  /* 背景图上方用深色渐变晕染，确保内容区卡片的亮色有足够对比 */
+  background: var(--bg-image) center center / cover no-repeat fixed;
   position: relative;
 }
 .page-wrapper::before {
   content: '';
   position: fixed;
   inset: 0;
-  background:
-    linear-gradient(180deg, rgba(15, 23, 42, 0.45) 0%, rgba(15, 23, 42, 0.2) 30%, rgba(15, 23, 42, 0.35) 100%);
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.45) 0%, rgba(15, 23, 42, 0.2) 30%, rgba(15, 23, 42, 0.35) 100%);
   pointer-events: none;
   z-index: 0;
 }
 
-/* ============ 内容容器（半透明毛玻璃） ============ */
 .home {
   position: relative;
   z-index: 1;
@@ -211,13 +257,12 @@ function clearResume() {
   margin: 0 auto;
   min-height: 100vh;
   padding: 0 clamp(16px, 4vw, 48px) 48px;
-  /* 半透明底色 + 轻微 backdrop-filter，让背景图可见但不过度干扰阅读 */
   background: rgba(255, 255, 255, 0.72);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
 
-/* ============ 顶部导航 ============ */
+/* ============ 导航 ============ */
 .nav {
   display: flex;
   justify-content: space-between;
@@ -251,11 +296,7 @@ function clearResume() {
   backdrop-filter: blur(4px);
 }
 .nav-btn:hover { background: rgba(241, 245, 249, 0.8); border-color: rgba(148, 163, 184, 0.5); }
-.nav-icon {
-  width: 27px; height: 27px;
-  object-fit: contain;
-  display: block;
-}
+.nav-icon { width: 27px; height: 27px; object-fit: contain; display: block; }
 
 .nav-btn.primary {
   background: linear-gradient(135deg, #1e40af, #1e3a5f);
@@ -263,9 +304,7 @@ function clearResume() {
   border-color: transparent;
   box-shadow: 0 2px 8px rgba(30, 64, 175, 0.35);
 }
-.nav-btn.primary:hover {
-  box-shadow: 0 4px 14px rgba(30, 64, 175, 0.45);
-}
+.nav-btn.primary:hover { box-shadow: 0 4px 14px rgba(30, 64, 175, 0.45); }
 
 .user-chip {
   display: flex;
@@ -279,7 +318,6 @@ function clearResume() {
   position: relative;
 }
 
-/* ---- 头像可点击区 ---- */
 .avatar-clickable {
   position: relative;
   cursor: pointer;
@@ -294,7 +332,6 @@ function clearResume() {
   transition: all 250ms cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
 }
-/* 呼吸光环动画 */
 .avatar-glow::before {
   content: '';
   position: absolute;
@@ -317,18 +354,12 @@ function clearResume() {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
-.avatar-clickable:hover .avatar-glow {
-  transform: scale(1.08);
-}
-.avatar-clickable:active .avatar-glow {
-  transform: scale(0.95);
-}
+.avatar-clickable:hover .avatar-glow { transform: scale(1.08); }
+.avatar-clickable:active .avatar-glow { transform: scale(0.95); }
 
-/* ---- 角标指示器 ---- */
 .avatar-badge {
   position: absolute;
-  bottom: -4px;
-  right: -4px;
+  bottom: -4px; right: -4px;
   width: 18px; height: 18px;
   border-radius: 50%;
   background: linear-gradient(135deg, #3b82f6, #6366f1);
@@ -341,7 +372,6 @@ function clearResume() {
   z-index: 5;
 }
 
-/* ---- 头像本体 ---- */
 .avatar {
   width: 36px; height: 36px;
   border-radius: 50%;
@@ -379,7 +409,7 @@ function clearResume() {
   flex-direction: column;
   align-items: center;
   text-align: center;
-  padding: 48px 0 36px;
+  padding: 40px 0 36px;
 }
 .hero-tag {
   display: inline-flex;
@@ -404,29 +434,245 @@ function clearResume() {
 
 .hero-title {
   margin: 0 0 16px;
-  font-size: clamp(32px, 5vw, 52px);
+  font-size: clamp(32px, 5vw, 56px);
   font-weight: 800;
-  line-height: 1.15;
+  line-height: 1.12;
   color: #0f172a;
   letter-spacing: -0.02em;
 }
-.hero-en { display: block; }
-.hero-accent {
+.hero-main {
   display: block;
   background: linear-gradient(135deg, #1e40af, #6366f1, #8b5cf6);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
+.hero-subtitle {
+  display: block;
+  font-size: clamp(16px, 2.5vw, 22px);
+  font-weight: 600;
+  color: #334155;
+  margin-top: 6px;
+}
 
 .hero-desc {
-  max-width: 520px;
+  max-width: 560px;
   margin: 0 auto;
   font-size: 16px;
   line-height: 1.65;
-  color: #334155;
+  color: #475569;
 }
 
+/* ============ Start Interview 按钮 ============ */
+.start-section {
+  margin-top: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+.btn-start {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 40px;
+  background: linear-gradient(135deg, #1e40af, #6366f1);
+  color: #fff;
+  border: none;
+  border-radius: 16px;
+  font-size: 20px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 8px 30px rgba(30, 64, 175, 0.4);
+  transition: all 250ms cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  overflow: hidden;
+}
+.btn-start::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, transparent, rgba(255,255,255,0.15));
+  opacity: 0;
+  transition: opacity 250ms;
+}
+.btn-start:hover {
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 14px 40px rgba(30, 64, 175, 0.5);
+}
+.btn-start:hover::before { opacity: 1; }
+.btn-start:active { transform: translateY(0) scale(0.98); }
+
+.btn-start-icon {
+  width: 28px; height: 28px;
+  background: rgba(255,255,255,0.25);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+.btn-start-text { letter-spacing: 0.02em; }
+.btn-start-zh {
+  font-size: 13px;
+  font-weight: 500;
+  opacity: 0.8;
+  margin-left: -4px;
+}
+.arrow {
+  margin-left: 4px;
+  transition: transform 200ms;
+  font-size: 18px;
+}
+.btn-start:hover .arrow { transform: translateX(6px); }
+
+/* ============ Interview Focus 选择器 ============ */
+.focus-selector {
+  width: 100%;
+  max-width: 520px;
+}
+.focus-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+  margin-bottom: 10px;
+  letter-spacing: 0.02em;
+}
+.focus-options {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+.focus-option {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1.5px solid rgba(148, 163, 184, 0.25);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  backdrop-filter: blur(4px);
+}
+.focus-option:hover {
+  background: rgba(255, 255, 255, 0.85);
+  border-color: rgba(99, 102, 241, 0.4);
+}
+.focus-option.active {
+  background: rgba(99, 102, 241, 0.08);
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.focus-radio {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.focus-radio-circle {
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  border: 2px solid #94a3b8;
+  flex-shrink: 0;
+  margin-top: 1px;
+  transition: all 200ms;
+  position: relative;
+}
+.focus-option.active .focus-radio-circle {
+  border-color: #6366f1;
+}
+.focus-option.active .focus-radio-circle::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: #6366f1;
+}
+
+.focus-info { display: flex; flex-direction: column; gap: 2px; }
+.focus-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+}
+.focus-name-zh {
+  font-size: 11px;
+  color: #64748b;
+}
+.focus-desc {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-top: 2px;
+  line-height: 1.4;
+}
+
+/* ============ 三阶段流程展示 ============ */
+.stages-section {
+  padding: 32px 0 16px;
+}
+.stages-flow {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 28px;
+}
+.stage-node {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  max-width: 280px;
+  padding: 16px 18px;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 16px;
+  backdrop-filter: blur(6px);
+  position: relative;
+}
+.stage-number {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: var(--stage-accent, #2563eb);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+.stage-body { flex: 1; min-width: 0; }
+.stage-label {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+}
+.stage-label-zh {
+  font-size: 11px;
+  color: var(--stage-accent, #2563eb);
+  font-weight: 600;
+}
+.stage-desc {
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 2px;
+  line-height: 1.4;
+}
+.stage-arrow {
+  position: absolute;
+  right: -16px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 18px;
+  color: #cbd5e1;
+  z-index: 2;
+}
+
+/* ============ 登录按钮（未登录状态）============ */
 .hero-cta { margin-top: 28px; }
 .btn-login {
   display: inline-flex;
@@ -447,17 +693,9 @@ function clearResume() {
   transform: translateY(-2px);
   box-shadow: 0 10px 28px rgba(15, 23, 42, 0.35);
 }
-.btn-login .arrow {
-  margin-left: 4px;
-  transition: transform 200ms;
-}
+.btn-login .arrow { margin-left: 4px; transition: transform 200ms; }
 .btn-login:hover .arrow { transform: translateX(4px); }
-
-.cta-emoji {
-  width: 30px; height: 30px;
-  object-fit: contain;
-  display: inline-block;
-}
+.cta-emoji { width: 30px; height: 30px; object-fit: contain; display: inline-block; }
 
 /* ============ 特性卡片 ============ */
 .features {
@@ -484,14 +722,16 @@ function clearResume() {
   border-color: rgba(148, 163, 184, 0.35);
 }
 .feature-icon {
-  width: 63px; height: 63px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, rgba(37, 99, 235, 0.12), rgba(99, 102, 241, 0.1));
-  display: flex; align-items: center; justify-content: center;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
 }
 .feature-icon img {
-  width: 42px; height: 42px;
+  width: 48px;
+  height: 48px;
   object-fit: contain;
   display: block;
 }
@@ -523,11 +763,7 @@ function clearResume() {
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
 }
-.resume-icon {
-  width: 48px; height: 48px;
-  object-fit: contain;
-  display: block;
-}
+.resume-icon { width: 48px; height: 48px; object-fit: contain; display: block; }
 .resume-text { flex: 1; min-width: 0; }
 .resume-title { font-size: 16px; font-weight: 700; color: #0f172a; margin-bottom: 3px; }
 .resume-sub   { font-size: 13px; color: #475569; }
@@ -549,15 +785,13 @@ function clearResume() {
   display: block;
   object-fit: contain;
   filter: drop-shadow(0 4px 12px rgba(30, 64, 175, 0.3));
-  transition: all 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 200ms;
 }
 .upload-btn:hover .upload-btn-icon {
   transform: translateY(-2px);
   filter: drop-shadow(0 6px 18px rgba(30, 64, 175, 0.45));
 }
-.upload-btn:active .upload-btn-icon {
-  transform: translateY(0);
-}
+.upload-btn:active .upload-btn-icon { transform: translateY(0); }
 
 .resume-info {
   display: flex;
@@ -571,85 +805,33 @@ function clearResume() {
   position: relative;
 }
 .resume-info .resume-name {
-  font-size: 13px;
-  font-weight: 700;
-  color: #065f46;
-  max-width: 200px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: 13px; font-weight: 700; color: #065f46;
+  max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .resume-info .resume-meta { font-size: 11px; color: #059669; }
 .resume-skills {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 2px;
-  max-width: 200px;
+  display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; max-width: 200px;
 }
 .skill-tiny {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: rgba(59, 130, 246, 0.12);
-  border: 1px solid rgba(59, 130, 246, 0.2);
-  color: #1d4ed8;
-  font-size: 11px;
-  font-weight: 500;
+  display: inline-block; padding: 2px 8px; border-radius: 999px;
+  background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.2);
+  color: #1d4ed8; font-size: 11px; font-weight: 500;
 }
 .skill-more {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: rgba(148, 163, 184, 0.1);
-  color: #64748b;
-  font-size: 11px;
-  font-weight: 500;
+  display: inline-block; padding: 2px 8px; border-radius: 999px;
+  background: rgba(148, 163, 184, 0.1); color: #64748b; font-size: 11px; font-weight: 500;
 }
 .ghost-btn {
   position: absolute; top: 4px; right: 4px;
   width: 18px; height: 18px;
   border: none; border-radius: 50%;
-  background: #fff;
-  color: #059669;
-  font-size: 11px;
-  cursor: pointer;
+  background: #fff; color: #059669;
+  font-size: 11px; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   transition: all 120ms;
 }
 .ghost-btn:hover { background: #fee2e2; color: #dc2626; }
-
-/* ============ 场景选择 ============ */
-.scenario-section { padding: 40px 0 16px; }
-.section-heading { text-align: center; margin-bottom: 24px; }
-.section-heading h2 { margin: 0 0 8px; }
-.section-heading .en {
-  display: block;
-  font-size: 24px;
-  font-weight: 800;
-  color: #0f172a;
-  letter-spacing: -0.01em;
-}
-.section-heading .zh {
-  display: block;
-  font-size: 15px;
-  color: #334155;
-  margin-top: 4px;
-  font-weight: 500;
-}
-.section-desc {
-  margin: 8px auto 0;
-  color: #475569;
-  font-size: 14px;
-  max-width: 600px;
-}
-
-.grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 18px;
-}
 
 /* ============ Footer ============ */
 .footer {
@@ -661,10 +843,67 @@ function clearResume() {
 .footer-en { margin: 0 0 4px; font-size: 13px; color: #334155; font-weight: 600; }
 .footer-zh { margin: 0; font-size: 12px; color: #64748b; }
 
+/* ============ 登录图标按钮 ============ */
+.login-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.login-btn-icon-img {
+  height: 64px;
+  width: auto;
+  display: block;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 12px rgba(30, 64, 175, 0.3));
+  transition: all 200ms;
+}
+.login-btn-icon:hover .login-btn-icon-img {
+  transform: translateY(-2px);
+  filter: drop-shadow(0 6px 18px rgba(30, 64, 175, 0.45));
+}
+.login-btn-icon:active .login-btn-icon-img { transform: translateY(0); }
+
+/* ============ 流程图展示 ============ */
+.stages-section {
+  padding: 40px 0 24px;
+}
+.flow-chart-wrap {
+  background: #ffffff;
+  border-radius: 24px;
+  padding: 28px 36px;
+  box-shadow: 
+    0 4px 24px rgba(15, 23, 42, 0.08),
+    0 1px 2px rgba(15, 23, 42, 0.04);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  transition: all 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.flow-chart-wrap:hover {
+  transform: translateY(-2px);
+  box-shadow: 
+    0 8px 36px rgba(15, 23, 42, 0.12),
+    0 2px 4px rgba(15, 23, 42, 0.06);
+}
+.flow-chart-img {
+  max-width: 100%;
+  width: min(900px, 100%);
+  height: auto;
+  display: block;
+  object-fit: contain;
+}
+
 /* ============ 响应式 ============ */
 @media (max-width: 880px) {
   .features { grid-template-columns: 1fr; }
-  .grid     { grid-template-columns: 1fr; }
+  .flow-chart-wrap { padding: 20px 20px; border-radius: 18px; }
+  .focus-options { flex-direction: column; }
 }
 
 @media (max-width: 640px) {
@@ -675,16 +914,13 @@ function clearResume() {
   .nav-label { display: none; }
   .hero { padding: 32px 0 24px; }
   .hero-desc { font-size: 14px; }
+  .btn-start { padding: 14px 28px; font-size: 17px; }
   .btn-login { padding: 12px 22px; font-size: 14px; }
-  .resume-card {
-    flex-direction: column;
-    text-align: center;
-    padding: 18px;
-  }
+  .login-btn-icon-img { height: 52px; }
+  .resume-card { flex-direction: column; text-align: center; padding: 18px; }
   .resume-text { width: 100%; }
   .resume-action { width: 100%; justify-content: center; }
   .resume-info { align-items: center; text-align: center; }
-  .section-heading .en { font-size: 20px; }
-  .section-heading .zh { font-size: 13px; }
+  .flow-chart-wrap { padding: 16px 14px; border-radius: 14px; }
 }
 </style>

@@ -1,7 +1,5 @@
 package com.interviewcoach.service;
 
-import com.interviewcoach.config.TtsProperties;
-import com.interviewcoach.config.TtsProperties.TtsProviderConfig;
 import com.interviewcoach.entity.UserProviderConfig;
 import com.interviewcoach.provider.IflytekTtsProvider;
 
@@ -21,7 +19,9 @@ import java.util.Base64;
 
 /**
  * TTS 语音合成服务。
- * 优先用户个人配置 → YML 全局配置 → Mock。
+ * 
+ * 配置来源：用户个人配置（UserProviderConfig）
+ * 默认模式：Mock（无用户配置时）
  */
 @Slf4j
 @Service
@@ -30,57 +30,30 @@ public class TtsService {
     @Autowired
     private UserConfigService userConfigService;
 
-    @Autowired
-    private TtsProperties ttsProperties;
-
     private static final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
             .build();
 
     /**
      * 文字转语音，返回 Base64 编码的音频。
-     * @param userId 用户ID
-     * @param text 要合成的文本
-     * @return Base64 音频字符串
      */
     public String synthesize(String userId, String text) {
         UserProviderConfig userCfg = userConfigService.getConfig(userId);
-        String provider = resolveProvider(userCfg);
-
-        if ("mock".equalsIgnoreCase(provider)) {
-            log.info("[TTS] Mock 模式");
+        
+        // 未配置时使用 Mock
+        if (userCfg == null || isBlank(userCfg.getTtsType()) || "mock".equalsIgnoreCase(userCfg.getTtsType())) {
+            log.info("[TTS] Mock 模式（无用户配置）");
             return null;
         }
 
-        if ("iflytek".equalsIgnoreCase(provider)) {
-            String userApiKey = userCfg != null ? userCfg.getTtsApiKey() : null;
-            String voice = userCfg != null ? userCfg.getTtsVoice() : null;
-            return synthesizeWithIflytek(text, userApiKey, voice);
+        if ("iflytek".equalsIgnoreCase(userCfg.getTtsType())) {
+            return synthesizeWithIflytek(userCfg, text);
         }
 
-        String apiKey = resolveApiKey(userCfg, provider);
-        if (isBlank(apiKey)) {
-            log.info("[TTS] Mock 模式（无 API Key）");
-            return null;
-        }
-
-        String baseUrl = resolveBaseUrl(userCfg, provider);
-        String voice = resolveVoice(userCfg, provider);
-        String model = resolveModel(provider);
-
-        try {
-            byte[] audio = callOpenAiTts(baseUrl, apiKey, model, voice, text);
-            log.info("[TTS] 合成成功, 音频大小: {} bytes", audio.length);
-            return Base64.getEncoder().encodeToString(audio);
-        } catch (Exception e) {
-            log.error("[TTS] 调用失败: {}", e.getMessage());
-            return null;
-        }
+        // OpenAI / Azure 等通用 API
+        return synthesizeWithOpenAiApi(userCfg, text);
     }
 
-    /**
-     * 文字转语音（使用 YML 全局配置）。
-     */
     public String synthesize(String text) {
         return synthesize(null, text);
     }
@@ -89,133 +62,74 @@ public class TtsService {
      * 文字转语音，存入文件。
      */
     public Path synthesizeToFile(String userId, String text, Path outputPath) throws IOException {
-        UserProviderConfig userCfg = userConfigService.getConfig(userId);
-        String provider = resolveProvider(userCfg);
-
-        if ("mock".equalsIgnoreCase(provider)) {
-            log.info("[TTS] Mock 模式，跳过文件生成");
-            return null;
-        }
-
-        if ("iflytek".equalsIgnoreCase(provider)) {
-            String userApiKey = userCfg != null ? userCfg.getTtsApiKey() : null;
-            String voice = userCfg != null ? userCfg.getTtsVoice() : null;
-            String base64 = synthesizeWithIflytek(text, userApiKey, voice);
-            if (base64 != null) {
-                byte[] audio = Base64.getDecoder().decode(base64);
-                Files.write(outputPath, audio);
-                log.info("[TTS] 讯飞音频已写入: {}", outputPath);
-                return outputPath;
-            }
-            return null;
-        }
-
-        String apiKey = resolveApiKey(userCfg, provider);
-        if (isBlank(apiKey)) {
-            log.info("[TTS] Mock 模式，跳过文件生成");
-            return null;
-        }
-
-        String baseUrl = resolveBaseUrl(userCfg, provider);
-        String voice = resolveVoice(userCfg, provider);
-        String model = resolveModel(provider);
-
-        try {
-            byte[] audio = callOpenAiTts(baseUrl, apiKey, model, voice, text);
+        String base64 = synthesize(userId, text);
+        if (base64 != null) {
+            byte[] audio = Base64.getDecoder().decode(base64);
             Files.write(outputPath, audio);
             log.info("[TTS] 音频已写入: {}", outputPath);
             return outputPath;
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IOException("TTS 调用被中断", e);
         }
+        return null;
     }
 
     // ========== 讯飞超拟人 TTS ==========
 
-    private String synthesizeWithIflytek(String text, String userApiKey, String voice) {
-        log.info("[TTS] 使用讯飞超拟人语音合成, textLen={}", text.length());
-        if (isBlank(userApiKey)) {
-            log.warn("[TTS] 用户未配置讯飞API Key，跳过合成");
+    private String synthesizeWithIflytek(UserProviderConfig userCfg, String text) {
+        String apiKey = userCfg.getTtsApiKey();
+        if (isBlank(apiKey)) {
+            log.warn("[TTS] 讯飞 API Key 未配置");
             return null;
         }
+        
+        String voice = userCfg.getTtsVoice();
+        if (isBlank(voice)) {
+            voice = "x5_lingfeiyi_flow";
+        }
+        
         try {
-            String defaultVoice = "x5_lingfeiyi_flow";
-            String finalVoice = voice != null && !voice.isBlank() ? voice : defaultVoice;
-            IflytekTtsProvider provider = new IflytekTtsProvider(userApiKey, finalVoice);
+            IflytekTtsProvider provider = new IflytekTtsProvider(apiKey, voice);
             return provider.synthesize(text);
         } catch (Exception e) {
-            log.error("[TTS] 讯飞超拟人合成失败: {}", e.getMessage());
+            log.error("[TTS] 讯飞合成失败: {}", e.getMessage());
             return null;
         }
     }
 
-    // ========== 内部方法 ==========
+    // ========== 通用 OpenAI API ==========
 
-    private String resolveProvider(UserProviderConfig userCfg) {
-        if (userCfg != null && !isBlank(userCfg.getTtsType())) {
-            return userCfg.getTtsType();
+    private String synthesizeWithOpenAiApi(UserProviderConfig userCfg, String text) {
+        String apiKey = userCfg.getTtsApiKey();
+        String baseUrl = userCfg.getTtsBaseUrl();
+        String model = "tts-1";
+        String voice = userCfg.getTtsVoice();
+        
+        if (isBlank(apiKey) || isBlank(baseUrl)) {
+            log.warn("[TTS] API 配置不完整");
+            return null;
         }
-        return ttsProperties.getProvider();
-    }
-
-    private String resolveApiKey(UserProviderConfig userCfg, String provider) {
-        if (userCfg != null && !isBlank(userCfg.getTtsApiKey())) {
-            return userCfg.getTtsApiKey();
+        
+        if (isBlank(voice)) {
+            voice = "alloy";
         }
-        TtsProviderConfig ymlCfg = switch (provider) {
-            case "openai" -> ttsProperties.getOpenai();
-            case "azure" -> ttsProperties.getAzure();
-            default -> null;
-        };
-        return ymlCfg != null ? ymlCfg.getApiKey() : null;
-    }
 
-    private String resolveBaseUrl(UserProviderConfig userCfg, String provider) {
-        if (userCfg != null && !isBlank(userCfg.getTtsBaseUrl())) {
-            return userCfg.getTtsBaseUrl();
+        try {
+            byte[] audio = callTtsApi(baseUrl, apiKey, model, voice, text);
+            log.info("[TTS] 合成成功, 音频大小: {} bytes", audio.length);
+            return Base64.getEncoder().encodeToString(audio);
+        } catch (Exception e) {
+            log.error("[TTS] API 调用失败: {}", e.getMessage());
+            return null;
         }
-        TtsProviderConfig ymlCfg = switch (provider) {
-            case "openai" -> ttsProperties.getOpenai();
-            case "azure" -> ttsProperties.getAzure();
-            default -> null;
-        };
-        return ymlCfg != null ? ymlCfg.getBaseUrl() : null;
     }
 
-    private String resolveVoice(UserProviderConfig userCfg, String provider) {
-        if (userCfg != null && !isBlank(userCfg.getTtsVoice())) {
-            return userCfg.getTtsVoice();
-        }
-        TtsProviderConfig ymlCfg = switch (provider) {
-            case "openai" -> ttsProperties.getOpenai();
-            case "azure" -> ttsProperties.getAzure();
-            default -> null;
-        };
-        return ymlCfg != null ? ymlCfg.getVoice() : "alloy";
-    }
-
-    private String resolveModel(String provider) {
-        return switch (provider) {
-            case "openai" -> ttsProperties.getOpenai().getModel();
-            case "azure" -> "tts";
-            default -> "tts-1";
-        };
-    }
-
-    /**
-     * 调用 OpenAI TTS API。
-     */
-    private byte[] callOpenAiTts(String baseUrl, String apiKey, String model, String voice, String text)
+    private byte[] callTtsApi(String baseUrl, String apiKey, String model, String voice, String text)
             throws IOException, InterruptedException {
         String url = baseUrl.replaceAll("/$", "") + "/v1/audio/speech";
-        log.info("[TTS] 调用 TTS API: {}, voice={}, textLen={}", url, voice, text.length());
+        log.info("[TTS] 调用 API: {}", url);
 
         String json = String.format(
                 "{\"model\":\"%s\",\"input\":\"%s\",\"voice\":\"%s\",\"response_format\":\"mp3\"}",
-                model,
-                escapeJson(text),
-                voice
+                model, escapeJson(text), voice
         );
 
         HttpRequest request = HttpRequest.newBuilder()
@@ -227,9 +141,7 @@ public class TtsService {
                 .build();
 
         HttpResponse<byte[]> response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
-        log.info("[TTS] 响应状态: {}, 音频大小: {} bytes", response.statusCode(),
-                response.body() != null ? response.body().length : 0);
-
+        
         if (response.statusCode() == 200) {
             return response.body();
         }
