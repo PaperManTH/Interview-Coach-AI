@@ -880,7 +880,7 @@ function startInterview() {
 }
 .flow-chart-img {
   max-width: 100%;
-  width: min(900px, 100%);
+  width: min(1000px, 100%);
   height: auto;
   display: block;
   object-fit: contain;

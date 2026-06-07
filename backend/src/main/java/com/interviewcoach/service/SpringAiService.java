@@ -5,6 +5,7 @@ import com.interviewcoach.entity.UserProviderConfig;
 import com.interviewcoach.mapper.ResumeProfileMapper;
 import com.interviewcoach.entity.ResumeProfile;
 import com.interviewcoach.entity.dto.ai.BilingualResponse;
+import com.interviewcoach.tool.ResumeTool;
 import com.interviewcoach.utils.BilingualResponseParser;
 
 import lombok.extern.slf4j.Slf4j;
@@ -13,6 +14,8 @@ import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.model.function.FunctionCallback;
+import org.springframework.ai.model.function.FunctionCallbackContext;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.openai.api.OpenAiApi;
@@ -42,6 +45,13 @@ public class SpringAiService {
 
     @Autowired
     private ChatModelConfig chatModelConfig;
+
+    /** 注册的 FunctionCallback（ResumeTool 等），LLM 可在对话中调用 */
+    @Autowired(required = false)
+    private List<FunctionCallback> functionCallbacks;
+
+    @Autowired(required = false)
+    private FunctionCallbackContext functionCallbackContext;
 
     /** 缓存用户 ChatModel，避免每次请求都创建 */
     private final ConcurrentHashMap<String, ChatModel> userModelCache = new ConcurrentHashMap<>();
@@ -104,6 +114,11 @@ public class SpringAiService {
         
         if ("technical".equals(stage)) {
             basePrompt = buildTechnicalPrompt(basePrompt, userId, focus);
+        }
+
+        // 告知 LLM 可调用工具
+        if (functionCallbacks != null && !functionCallbacks.isEmpty()) {
+            basePrompt += "\n\n你可以调用 updateUserResume 工具来保存用户在对话中透露的技能、项目经验、工作经历等信息到简历数据库。";
         }
 
         return basePrompt + "\n\n当前阶段：" + stage + " | 面试重点：" + focus;
@@ -171,21 +186,31 @@ public class SpringAiService {
         }
 
         try {
+            ResumeTool.setCurrentUserId(userId);
+
             List<Message> messages = List.of(
                     new SystemMessage(systemMessage),
                     new UserMessage(userMessage)
             );
-            Prompt prompt = new Prompt(messages);
-            String content = model.call(prompt).getResult().getOutput().getContent();
 
-            log.info("[AI] 响应长度: {} chars", content.length());
-            return content;
+            Prompt prompt;
+            if (functionCallbacks != null && !functionCallbacks.isEmpty()) {
+                OpenAiChatOptions.Builder optBuilder = OpenAiChatOptions.builder();
+                for (FunctionCallback cb : functionCallbacks) {
+                    optBuilder.withFunction(cb.getName());
+                }
+                prompt = new Prompt(messages, optBuilder.build());
+            } else {
+                prompt = new Prompt(messages);
+            }
+
+            String content = model.call(prompt).getResult().getOutput().getContent();
+            log.info("[AI] 响应长度: {} chars", content != null ? content.length() : 0);
+            return content != null ? content : "";
         } catch (Exception e) {
-            // ===== 识别常见的 provider 错误并给出友好降级 =====
             String rawMsg = e.getMessage() == null ? "unknown error" : e.getMessage();
             String lowerMsg = rawMsg.toLowerCase();
 
-            // 402 余额不足 / 429 限流 / 401 未授权
             if (rawMsg.startsWith("402") || lowerMsg.contains("insufficient balance") || lowerMsg.contains("quota")) {
                 log.error("[AI] Provider 余额不足 (402), 降级到模拟回复: {}", rawMsg);
             } else if (rawMsg.startsWith("429") || lowerMsg.contains("rate limit") || lowerMsg.contains("too many")) {
@@ -196,8 +221,9 @@ public class SpringAiService {
                 log.error("[AI] ChatModel 调用失败: {}", rawMsg);
             }
 
-            // 全部降级到 mock 回复，避免阻断用户体验
             return mock(userMessage);
+        } finally {
+            ResumeTool.clearCurrentUserId();
         }
     }
 
@@ -235,7 +261,7 @@ public class SpringAiService {
                 .withModel(model)
                 .withTemperature(0.7f)
                 .build();
-        return new OpenAiChatModel(api, options);
+        return new OpenAiChatModel(api, options, functionCallbackContext, null);
     }
 
     private static boolean isBlank(String s) { return s == null || s.isBlank(); }
