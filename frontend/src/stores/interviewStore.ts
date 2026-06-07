@@ -11,6 +11,7 @@ import {
   getSessionDetail,
   getSessionMessages,
   pauseSession,
+  endSession,
   type InterviewMessage,
 } from '@/services/conversationApi';
 
@@ -23,6 +24,8 @@ const STAGE_OPENINGS: Record<InterviewStage, string> = {
 
 /** 每阶段多少轮对话后自动切换下一阶段 */
 const ROUNDS_PER_STAGE = 3;
+/** 总阶段数 × 每阶段轮数 = 最大对话轮数 */
+const MAX_TOTAL_ROUNDS = INTERVIEW_STAGES.length * ROUNDS_PER_STAGE;
 
 const FALLBACK_OPENING = "Hi, let's begin the interview. Please start with a brief introduction.";
 
@@ -59,7 +62,9 @@ export const useInterviewStore = defineStore('interview', {
     mockReplyCursor: 0,
     isWsConnected: false,
     recordingDuration: 0,
-    audioTranscript: ''
+    audioTranscript: '',
+    isCompleted: false,     // 面试是否已完成全部阶段
+    isAwaitingSummary: false, // 等待 AI 生成面试总结
   }),
 
   getters: {
@@ -129,33 +134,33 @@ export const useInterviewStore = defineStore('interview', {
       this.completedStages = [];
       this._initCore();
 
-      const opening = STAGE_OPENINGS['warmup'];
+      const meta = getStageMeta('warmup');
+      this.messages.push({
+        id: uid(),
+        role: 'system',
+        content: `--- ${meta?.labelZh ?? '热身环节'} ---`,
+        createdAt: Date.now(),
+        isSystem: true
+      });
+
       this.messages.push({
         id: uid(),
         role: 'ai',
-        content: opening,
+        content: STAGE_OPENINGS['warmup'],
         createdAt: Date.now(),
         stageInfo: { stage: 'warmup', label: 'Warm-up', labelZh: '热身环节' }
       });
       this.connectWebSocket();
     },
 
-    /** 暂停当前会话（用户点击退出/返回时调用） */
     async pauseCurrentSession(): Promise<void> {
+      if (this.isCompleted) return;
       const sid = this.sessionId;
-      console.log('[Interview] 准备暂停会话, sessionId=', sid);
-      if (!sid) {
-        console.log('[Interview] 无 sessionId，跳过暂停');
-        return;
-      }
+      if (!sid) return;
       try {
-        const result = await pauseSession(sid);
-        console.log('[Interview] 会话暂停结果:', sid, result);
-        if (!result.success) {
-          console.warn('[Interview] 暂停会话失败，sessionId可能不正确:', sid);
-        }
+        await pauseSession(sid);
       } catch (e) {
-        console.error('[Interview] 暂停会话异常:', e);
+        console.warn('[Interview] 暂停会话失败:', e);
       }
     },
 
@@ -182,18 +187,19 @@ export const useInterviewStore = defineStore('interview', {
             this.isDynamicMode = false;
             this.scene = type;
           }
-          // 优先从会话数据中直接读取阶段信息（最可靠）
+          // 已结束的会话禁用输入
+          if (sessionResp.session.status === 'ENDED') {
+            this.isCompleted = true;
+            return;
+          }
           if (sessionResp.session.currentStage) {
             this.currentStage = sessionResp.session.currentStage as InterviewStage;
-            console.log('[Store] 从会话数据恢复阶段:', this.currentStage);
           }
           if (sessionResp.session.stageRound != null) {
             this.stageRound = Number(sessionResp.session.stageRound);
-            console.log('[Store] 从会话数据恢复阶段轮次:', this.stageRound);
           }
           if (sessionResp.session.totalRounds != null) {
             this.totalRounds = Number(sessionResp.session.totalRounds);
-            console.log('[Store] 从会话数据恢复总轮次:', this.totalRounds);
           }
         }
         if (msgResp?.success && Array.isArray(msgResp.data)) {
@@ -236,7 +242,6 @@ export const useInterviewStore = defineStore('interview', {
           // 如果会话数据中没有阶段信息，尝试从消息 metadata 中恢复
           if (!sessionResp?.session?.currentStage && savedStage) {
             this.currentStage = savedStage as InterviewStage;
-            console.log('[Store] 从消息 metadata 恢复阶段:', savedStage);
           }
           
           // 如果会话数据中也没有轮次信息，根据消息数量估算
@@ -249,7 +254,6 @@ export const useInterviewStore = defineStore('interview', {
               this.stageRound = Math.max(0, this.totalRounds - stageIndex * 3);
             }
           }
-          console.log('[Store] 恢复会话完成: stage=', this.currentStage, 'round=', this.stageRound, 'total=', this.totalRounds);
         }
       } catch (e) {
         console.warn('[Store] 恢复会话消息失败:', e);
@@ -257,6 +261,14 @@ export const useInterviewStore = defineStore('interview', {
 
       // 如果拉取不到历史消息，则至少显示一条开场白
       if (this.messages.length === 0) {
+        const meta = getStageMeta('warmup');
+        this.messages.push({
+          id: uid(),
+          role: 'system',
+          content: `--- ${meta?.labelZh ?? '热身环节'} ---`,
+          createdAt: Date.now(),
+          isSystem: true
+        });
         this.messages.push({
           id: uid(),
           role: 'ai',
@@ -275,6 +287,8 @@ export const useInterviewStore = defineStore('interview', {
       this.mockReplyCursor = 0;
       this.status = 'idle';
       this.isWsConnected = false;
+      this.isCompleted = false;
+      this.isAwaitingSummary = false;
     },
 
     // ===== WebSocket =====
@@ -415,12 +429,15 @@ export const useInterviewStore = defineStore('interview', {
 
       if (role === 'ai') {
         this.status = 'idle';
-        // 动态模式：根据 AI 消息中的阶段信息更新当前阶段
+
+        if (this.isAwaitingSummary) {
+          this.showEndMessage();
+          return;
+        }
+
         if (this.isDynamicMode && msgStage) {
           this.currentStage = msgStage as InterviewStage;
-          console.log('[Store] 从AI消息更新阶段:', msgStage);
         }
-        // 动态模式：检查阶段切换
         if (this.isDynamicMode) {
           this.checkStageTransition();
         }
@@ -473,7 +490,7 @@ export const useInterviewStore = defineStore('interview', {
 
     async sendUserMessage(text: string) {
       const trimmed = text.trim();
-      if (!trimmed || this.status !== 'idle') return;
+      if (!trimmed || this.status !== 'idle' || this.isCompleted) return;
 
       this.status = 'thinking';
 
@@ -556,7 +573,6 @@ export const useInterviewStore = defineStore('interview', {
     checkStageTransition() {
       if (!this.isDynamicMode || !this.currentStage) return;
 
-      // 达到该阶段轮数上限时自动切换
       if (this.stageRound >= ROUNDS_PER_STAGE) {
         const currentIndex = INTERVIEW_STAGES.findIndex(s => s.key === this.currentStage);
         const nextIndex = currentIndex + 1;
@@ -565,7 +581,6 @@ export const useInterviewStore = defineStore('interview', {
           const nextStage = INTERVIEW_STAGES[nextIndex].key;
           this.advanceToStage(nextStage);
 
-          // 插入过渡系统消息
           const meta = getStageMeta(nextStage);
           this.messages.push({
             id: uid(),
@@ -575,7 +590,6 @@ export const useInterviewStore = defineStore('interview', {
             isSystem: true
           });
 
-          // 新阶段开场白
           this.messages.push({
             id: uid(),
             role: 'ai',
@@ -583,9 +597,60 @@ export const useInterviewStore = defineStore('interview', {
             createdAt: Date.now(),
             stageInfo: { stage: nextStage, label: meta?.label ?? '', labelZh: meta?.labelZh ?? '' }
           });
+        } else {
+          this.finishAndSummarize();
         }
-        // 最后一个阶段结束后不再切换
       }
+    },
+
+    /** 面试完成：立即标记结束 + 异步请求 AI 总结 */
+    finishAndSummarize() {
+      this.isCompleted = true;
+      if (this.sessionId) {
+        endSession(this.sessionId).catch(() => {});
+      }
+      this.requestSummary();
+    },
+
+    requestSummary() {
+      this.isAwaitingSummary = true;
+      this.status = 'thinking';
+
+      this.messages.push({
+        id: uid(),
+        role: 'system',
+        content: '--- 面试总结 ---',
+        createdAt: Date.now(),
+        isSystem: true
+      });
+
+      const wsClient = getWebSocketClient();
+      if (wsClient && wsClient.isConnectedState()) {
+        wsClient.send({
+          id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          type: 'TEXT',
+          sender: this.sessionId || 'anonymous',
+          receiver: '',
+          content: '请用中文对本次面试进行总结评价，包括表现好的方面和需要改进的地方。',
+          timestamp: Date.now(),
+          metadata: { summary: true }
+        });
+      } else {
+        this.showEndMessage();
+      }
+    },
+
+    /** 总结回复到达后显示结束语 */
+    showEndMessage() {
+      this.isAwaitingSummary = false;
+      this.status = 'idle';
+      this.messages.push({
+        id: uid(),
+        role: 'system',
+        content: '面试已完成，感谢你的参与！',
+        createdAt: Date.now(),
+        isSystem: true
+      });
     },
 
     /** 切换到指定阶段 */
@@ -601,7 +666,7 @@ export const useInterviewStore = defineStore('interview', {
     // ===== 录音相关 =====
 
     async startRecording() {
-      if (this.isMicActive || this.status !== 'idle') return;
+      if (this.isMicActive || this.status !== 'idle' || this.isCompleted) return;
 
       this.isMicActive = true;
       this.status = 'listening';
@@ -758,6 +823,8 @@ export const useInterviewStore = defineStore('interview', {
       this.isWsConnected = false;
       this.recordingDuration = 0;
       this.audioTranscript = '';
+      this.isCompleted = false;
+      this.isAwaitingSummary = false;
 
       destroyWebSocketClient();
       destroyAudioRecorder();

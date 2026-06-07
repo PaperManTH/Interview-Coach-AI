@@ -15,7 +15,7 @@ const router = useRouter();
 const store = useInterviewStore();
 
 const isDynamicMode = computed(() => route.name === 'DynamicInterview');
-const busy = computed(() => store.status !== 'idle');
+const busy = computed(() => store.status !== 'idle' || store.isCompleted);
 
 onMounted(async () => {
   // 支持通过 ?resumeSessionId=xxx 恢复之前的会话
