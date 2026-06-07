@@ -34,7 +34,7 @@ public class IflytekAsrProvider {
     private final String apiSecret;
 
     /**
-     * @param combinedKey 格式: "appid:apikey:apisecret"，如 "dc4634b7:236f94aeb93bf2be36af835f6c9d0935:ZTUxZmMwYWY3OTQ1ZDZjNWVhY2E2MmZh"
+     * @param combinedKey 格式: "appid:apikey:apisecret"
      */
     public IflytekAsrProvider(String combinedKey) {
         String[] parts = parseCombinedKey(combinedKey);
@@ -257,8 +257,17 @@ public class IflytekAsrProvider {
             }
 
             // status=2 是最终稳定结果，覆盖之前的临时结果
-            if (status == 2 || finalText.length() == 0) {
-                finalText.setLength(0);
+            // 但如果最后一包是空的，保留之前的累积结果
+            if (status == 2) {
+                if (segment.length() > 0) {
+                    finalText.setLength(0);
+                    finalText.append(segment);
+                }
+            } else if (finalText.length() == 0 && segment.length() > 0) {
+                // 第一帧有结果时初始化
+                finalText.append(segment);
+            } else if (segment.length() > 0) {
+                // 中间帧追加结果
                 finalText.append(segment);
             }
         } catch (Exception e) {

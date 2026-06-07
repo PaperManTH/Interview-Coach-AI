@@ -13,7 +13,7 @@ import java.nio.file.Paths;
 
 public class IflytekAsrProviderTest {
 
-    private static final String COMBINED_KEY = "dc4634b7:236f94aeb93bf2be36af835f6c9d0935:ZTUxZmMwYWY3OTQ1ZDZjNWVhY2E2MmZh";
+    private static final String COMBINED_KEY = System.getenv().getOrDefault("IFLYTEK_COMBINED_KEY", "appId:apiKey:apiSecret");
 
     @Test
     public void testIflytekAsr() throws Exception {

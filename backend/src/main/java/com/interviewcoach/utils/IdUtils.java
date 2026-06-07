@@ -1,4 +1,4 @@
-package com.interviewcoach.util;
+package com.interviewcoach.utils;
 
 import java.util.UUID;
 

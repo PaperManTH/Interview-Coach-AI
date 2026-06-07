@@ -4,6 +4,7 @@ import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * Interview Coach AI 启动类。
@@ -13,6 +14,7 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 })
 @ConfigurationPropertiesScan("com.interviewcoach.config")
 @MapperScan("com.interviewcoach.mapper")
+@EnableScheduling
 public class InterviewCoachApplication {
 
     public static void main(String[] args) {

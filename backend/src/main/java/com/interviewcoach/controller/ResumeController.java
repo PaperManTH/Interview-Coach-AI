@@ -1,5 +1,6 @@
 package com.interviewcoach.controller;
 
+import com.interviewcoach.common.Constants;
 import com.interviewcoach.entity.dto.common.ApiResponse;
 import com.interviewcoach.entity.dto.resume.ResumeParsedData;
 import com.interviewcoach.entity.dto.resume.ResumeResponse;
@@ -26,7 +27,10 @@ public class ResumeController {
     private final ResumeService resumeService;
 
     /**
-     * 上传简历文件并解析。
+     * 上传简历文件并解析
+     * @param file   简历文件
+     * @param userId 用户 ID（可选）
+     * @return  解析后的简历信息
      */
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<ResumeResponse>> upload(
@@ -34,7 +38,7 @@ public class ResumeController {
             @RequestHeader(value = "X-User-Id", required = false) String userId) {
 
         if (userId == null || userId.isBlank()) {
-            userId = "anonymous";
+            userId = Constants.DEFAULT_USER_ID;
         }
 
         log.info("[ResumeController] 收到简历上传 userId={}, name={}, size={}",
@@ -45,7 +49,10 @@ public class ResumeController {
     }
 
     /**
-     * 手动录入简历信息（前端直接传结构化数据，后端不调 LLM）。
+     * 手动录入简历信息
+     * @param data   简历数据
+     * @param userId 用户 ID（可选）
+     * @return  保存结果
      */
     @PostMapping("/manual")
     public ResponseEntity<ApiResponse<ResumeResponse>> saveManual(
@@ -53,7 +60,7 @@ public class ResumeController {
             @RequestHeader(value = "X-User-Id", required = false) String userId) {
 
         if (userId == null || userId.isBlank()) {
-            userId = "anonymous";
+            userId = Constants.DEFAULT_USER_ID;
         }
         log.info("[ResumeController] 手动录入简历 userId={}", userId);
         ResumeResponse resp = resumeService.saveManual(data, userId);
@@ -61,14 +68,16 @@ public class ResumeController {
     }
 
     /**
-     * 获取已保存的手动简历。
+     * 获取已保存的简历信息
+     * @param userId 用户 ID（可选）
+     * @return  简历数据或不存在标记
      */
     @GetMapping("/manual")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getManual(
             @RequestHeader(value = "X-User-Id", required = false) String userId) {
 
         if (userId == null || userId.isBlank()) {
-            userId = "anonymous";
+            userId = Constants.DEFAULT_USER_ID;
         }
         log.info("[ResumeController] 获取手动简历 userId={}", userId);
         ResumeParsedData data = resumeService.getManual(userId);

@@ -1,157 +1,94 @@
 package com.interviewcoach.config;
 
-import lombok.Data;
+import com.interviewcoach.common.Constants;
+import com.interviewcoach.common.InterviewConstants;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.chat.model.ChatModel;
-import org.springframework.ai.openai.OpenAiChatModel;
-import org.springframework.ai.openai.OpenAiChatOptions;
-import org.springframework.ai.openai.api.OpenAiApi;
-import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.boot.context.properties.NestedConfigurationProperty;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.ClassPathResource;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * ChatModel 工厂：统一处理所有 OpenAI 兼容 Provider。
- * <p>
- * 国内厂商：deepseek / qwen(阿里百炼) / glm(智谱) / kimi(Moonshot)
- * 国外厂商：openai / azure
- * <p>
- * 全部走 OpenAiApi + OpenAiChatModel，切换只需改配置
+ * ChatModel 配置 + 提示词管理
  */
 @Slf4j
 @Configuration
-@EnableConfigurationProperties
 public class ChatModelConfig {
 
-    private final LlmProperties llmProperties;
+    private static final String PROMPTS_DIR = "prompts";
 
-    public ChatModelConfig(LlmProperties llmProperties) {
-        this.llmProperties = llmProperties;
+    /** 缓存已加载的提示词 */
+    private final Map<String, String> promptCache = new ConcurrentHashMap<>();
+
+    @PostConstruct
+    public void init() {
+        loadPrompt("system", "system-default.txt");
+        loadPrompt(InterviewConstants.STAGE_WARMUP, "stage-warmup.txt");
+        loadPrompt(InterviewConstants.STAGE_TECHNICAL, "stage-technical.txt");
+        loadPrompt(InterviewConstants.STAGE_PRESSURE, "stage-pressure.txt");
+        log.info("[Config] 提示词加载完成");
     }
 
-    @Bean
-    public ChatModel chatModel() {
-        String provider = llmProperties.getProvider();
-        log.info("[LLM] Provider: {}", provider);
-
-        if ("mock".equalsIgnoreCase(provider)) {
-            log.info("[LLM] Mock 模式");
-            return null;
+    private void loadPrompt(String key, String fileName) {
+        String path = PROMPTS_DIR + "/" + fileName;
+        try {
+            ClassPathResource resource = new ClassPathResource(path);
+            if (resource.exists()) {
+                String content = new String(resource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+                promptCache.put(key, content.trim());
+                log.debug("[Config] 已加载提示词: {}", path);
+            } else {
+                log.warn("[Config] 提示词文件不存在: {}", path);
+            }
+        } catch (IOException e) {
+            log.error("[Config] 加载提示词失败: {}, error={}", path, e.getMessage());
         }
-
-        ProviderConfig cfg = selectProviderConfig(provider);
-        if (cfg == null || isBlank(cfg.getApiKey())) {
-            log.info("[LLM] {} Key 未设置，使用 Mock 模式", provider);
-            return null;
-        }
-
-        String baseUrl = resolveBaseUrl(provider, cfg);
-        String model = cfg.getModel();
-
-        log.info("[LLM] 创建 ChatModel: provider={}, model={}, baseUrl={}", provider, model, baseUrl);
-        return buildModel(baseUrl, cfg.getApiKey(), model);
     }
 
-    /**
-     * 根据 provider 名称选择对应配置。
-     */
-    private ProviderConfig selectProviderConfig(String provider) {
-        Map<String, ProviderConfig> map = Map.of(
-                "openai", llmProperties.getOpenai(),
-                "azure", llmProperties.getAzure(),
-                "deepseek", llmProperties.getDeepseek(),
-                "qwen", llmProperties.getQwen(),
-                "glm", llmProperties.getGlm(),
-                "kimi", llmProperties.getKimi()
-        );
-        return map.getOrDefault(provider, null);
+    // ===== 提示词获取 =====
+
+    public String getSystemPrompt() {
+        return promptCache.getOrDefault("system", "你是一个专业的面试教练助手。");
     }
 
-    /**
-     * Azure 需要拼接 deployment 路径，其余直接使用 baseUrl。
-     */
-    private String resolveBaseUrl(String provider, ProviderConfig cfg) {
-        if ("azure".equalsIgnoreCase(provider)) {
-            // Azure: endpoint + /openai/deployments/{model}
-            return cfg.getBaseUrl().replaceAll("/$", "")
-                    + "/openai/deployments/" + cfg.getModel();
-        }
-        return cfg.getBaseUrl();
+    public String getWarmupPrompt() {
+        return promptCache.getOrDefault("warmup", "");
     }
 
-    private ChatModel buildModel(String baseUrl, String apiKey, String model) {
-        OpenAiApi api = new OpenAiApi(baseUrl, apiKey);
-        OpenAiChatOptions options = OpenAiChatOptions.builder()
-                .withModel(model)
-                .withTemperature((float) llmProperties.getTemperature())
-                .build();
-        return new OpenAiChatModel(api, options);
+    public String getTechnicalPrompt() {
+        return promptCache.getOrDefault("technical", "");
     }
 
-    private static boolean isBlank(String s) {
-        return s == null || s.isBlank();
+    public String getPressurePrompt() {
+        return promptCache.getOrDefault("pressure", "");
     }
 
-    /**
-     * 获取 Provider 的默认 BaseUrl。
-     * @param provider deepseek / qwen / glm / kimi / openai / azure
-     */
-    public static String getDefaultBaseUrl(String provider) {
-        return switch (provider.toLowerCase()) {
-            case "deepseek" -> "https://api.deepseek.com";
-            case "qwen" -> "https://dashscope.aliyuncs.com/compatible-mode/v1";
-            case "glm" -> "https://open.bigmodel.cn/api/paas/v4";
-            case "kimi" -> "https://api.moonshot.cn/v1";
-            case "openai" -> "https://api.openai.com";
-            default -> "https://api.openai.com";
+    public String getPromptByStage(String stage) {
+        return switch (stage) {
+            case InterviewConstants.STAGE_WARMUP -> getWarmupPrompt();
+            case InterviewConstants.STAGE_TECHNICAL -> getTechnicalPrompt();
+            case InterviewConstants.STAGE_PRESSURE -> getPressurePrompt();
+            default -> getSystemPrompt();
         };
     }
 
-    // ==================== Configuration Properties ====================
+    // ===== Provider BaseUrl =====
 
-    @Data
-    @ConfigurationProperties(prefix = "app.llm")
-    public static class LlmProperties {
-        private String provider = "mock";
-        private double temperature = 0.7;
-
-        @NestedConfigurationProperty
-        private ProviderConfig openai = new ProviderConfig("https://api.openai.com", "gpt-4o-mini");
-
-        @NestedConfigurationProperty
-        private ProviderConfig azure = new ProviderConfig("", "gpt-4o-mini");
-
-        @NestedConfigurationProperty
-        private ProviderConfig deepseek = new ProviderConfig("https://api.deepseek.com", "deepseek-chat");
-
-        @NestedConfigurationProperty
-        private ProviderConfig qwen = new ProviderConfig(
-                "https://dashscope.aliyuncs.com/compatible-mode/v1", "qwen-plus");
-
-        @NestedConfigurationProperty
-        private ProviderConfig glm = new ProviderConfig(
-                "https://open.bigmodel.cn/api/paas/v4", "glm-4-flash");
-
-        @NestedConfigurationProperty
-        private ProviderConfig kimi = new ProviderConfig(
-                "https://api.moonshot.cn/v1", "moonshot-v1-8k");
-    }
-
-    @Data
-    public static class ProviderConfig {
-        private String apiKey;
-        private String baseUrl;
-        private String model;
-
-        public ProviderConfig() {}
-
-        public ProviderConfig(String baseUrl, String model) {
-            this.baseUrl = baseUrl;
-            this.model = model;
-        }
+    public static String getDefaultBaseUrl(String provider) {
+        if (provider == null) return "https://api.openai.com";
+        
+        return switch (provider.toLowerCase()) {
+            case "deepseek" -> "https://api.deepseek.com";
+            case Constants.PROVIDER_QIANWEN -> "https://dashscope.aliyuncs.com/compatible-mode/v1";
+            case "glm" -> "https://open.bigmodel.cn/api/paas/v4";
+            case "kimi" -> "https://api.moonshot.cn/v1";
+            case Constants.PROVIDER_OPENAI -> "https://api.openai.com";
+            case Constants.PROVIDER_AZURE -> "https://{your-resource}.openai.azure.com";
+            default -> "https://api.openai.com";
+        };
     }
 }

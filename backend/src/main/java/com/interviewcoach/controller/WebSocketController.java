@@ -14,14 +14,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * WebSocket 管理 REST 控制器。
- * <p>
- * 提供：
- * <ul>
- *   <li>向指定会话/用户发送消息</li>
- *   <li>查询在线会话状态</li>
- *   <li>广播消息</li>
- * </ul>
+ * WebSocket 管理 REST 控制器
  */
 @Slf4j
 @RestController
@@ -32,7 +25,7 @@ public class WebSocketController {
     private final WebSocketSessionManager sessionManager;
 
     /**
-     * 向指定 sessionId 发送消息。
+     * 向指定 sessionId 发送消息
      *
      * @param sessionId 目标会话 ID
      * @param content   消息内容
@@ -66,7 +59,7 @@ public class WebSocketController {
     }
 
     /**
-     * 向指定用户的所有会话发送消息。
+     * 向指定用户的所有会话发送消息
      *
      * @param userId  目标用户 ID
      * @param content 消息内容
@@ -93,7 +86,7 @@ public class WebSocketController {
     }
 
     /**
-     * 广播消息到所有在线会话。
+     * 广播消息到所有在线会话
      *
      * @param content 消息内容
      * @return 发送的会话数量
@@ -115,7 +108,7 @@ public class WebSocketController {
     }
 
     /**
-     * 查询指定会话状态。
+     * 查询指定会话状态
      *
      * @param sessionId 会话 ID
      * @return 会话状态信息
@@ -130,7 +123,7 @@ public class WebSocketController {
     }
 
     /**
-     * 查询指定用户的所有会话。
+     * 查询指定用户的所有会话
      *
      * @param userId 用户 ID
      * @return 会话列表
@@ -144,7 +137,7 @@ public class WebSocketController {
     }
 
     /**
-     * 查询所有在线会话。
+     * 查询所有在线会话
      *
      * @return 所有在线会话列表
      */
@@ -157,7 +150,7 @@ public class WebSocketController {
     }
 
     /**
-     * 查询在线会话数量。
+     * 查询在线会话数量
      *
      * @return 在线会话数量
      */
@@ -167,7 +160,7 @@ public class WebSocketController {
     }
 
     /**
-     * 转换 InterviewWsSession 到 SessionStatusDTO。
+     * 转换 InterviewWsSession 到 SessionStatusDTO
      */
     private SessionStatusDTO toStatusDTO(InterviewWsSession ws) {
         return SessionStatusDTO.builder()

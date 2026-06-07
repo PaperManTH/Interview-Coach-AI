@@ -22,10 +22,16 @@ const routes: RouteRecordRaw[] = [
     meta: { title: 'Logging in...', guest: true },
   },
   {
-    path: '/interview/:scene',
+    path: '/interview/:scene?',
     name: 'Interview',
     component: () => import('@/pages/Interview.vue'),
     meta: { title: 'Interview Session', requiresAuth: true },
+  },
+  {
+    path: '/interview/dynamic',
+    name: 'DynamicInterview',
+    component: () => import('@/pages/Interview.vue'),
+    meta: { title: 'Dynamic Interview', requiresAuth: true },
   },
   {
     path: '/settings',
@@ -38,6 +44,12 @@ const routes: RouteRecordRaw[] = [
     name: 'Profile',
     component: () => import('@/pages/Profile.vue'),
     meta: { title: 'Profile', requiresAuth: true },
+  },
+  {
+    path: '/history',
+    name: 'History',
+    component: () => import('@/pages/History.vue'),
+    meta: { title: 'Interview History', requiresAuth: true },
   },
   {
     path: '/:pathMatch(.*)*',

@@ -1,6 +1,7 @@
-package com.interviewcoach.util;
+package com.interviewcoach.utils;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.interviewcoach.entity.dto.websocket.MessageDTO;
@@ -45,6 +46,13 @@ public final class MessageCodec {
      */
     public static <T> T fromJson(String raw, Class<T> type) throws IOException {
         return MAPPER.readValue(raw, type);
+    }
+
+    /**
+     * 解析 JSON 字符串为 JsonNode，用于提取特定字段。
+     */
+    public static JsonNode parseJson(String raw) throws IOException {
+        return MAPPER.readTree(raw);
     }
 
     /**

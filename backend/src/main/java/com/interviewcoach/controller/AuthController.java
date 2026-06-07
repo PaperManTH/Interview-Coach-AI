@@ -21,16 +21,22 @@ public class AuthController {
 
     private final AuthService authService;
 
-    // ==================== State ====================
-
+    /**
+     * 生成 state。
+     * @return  state
+     */
     @PostMapping("/state")
     public ResponseEntity<ApiResponse<Map<String, String>>> generateState() {
         String state = authService.generateState();
         return ResponseEntity.ok(ApiResponse.ok(Map.of("state", state)));
     }
 
-    // ==================== 登录 ====================
-
+    /**
+     * 登录。
+     * @param code  GitHub 登录返回的 code
+     * @param state GitHub 登录返回的 state
+     * @return  登录结果
+     */
     @PostMapping("/login/github")
     public ResponseEntity<ApiResponse<LoginResponse>> loginWithGithub(
             @RequestParam String code,
@@ -47,8 +53,11 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
-    // ==================== 当前用户 ====================
-
+    /**
+     * 获取当前用户信息。
+     * @param auth  Authorization header
+     * @return  当前用户信息
+     */
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<LoginResponse>> me(@RequestHeader("Authorization") String auth) {
         String token = extractToken(auth);
@@ -62,8 +71,11 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
-    // ==================== 登出 / 验证 ====================
-
+    /**
+     * 登出。
+     * @param auth  Authorization header
+     * @return  登出结果
+     */
     @PostMapping("/logout")
     public ResponseEntity<ApiResponse<Void>> logout(@RequestHeader("Authorization") String auth) {
         String token = extractToken(auth);
@@ -76,6 +88,11 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.ok());
     }
 
+    /**
+     * 验证 token。
+     * @param auth  Authorization header
+     * @return  用户 ID
+     */
     @GetMapping("/validate")
     public ResponseEntity<ApiResponse<String>> validateToken(@RequestHeader("Authorization") String auth) {
         String token = extractToken(auth);
@@ -89,11 +106,10 @@ public class AuthController {
         return ResponseEntity.status(401).body(ApiResponse.error(401, "无效的 token"));
     }
 
-    // ==================== 工具方法 ====================
-
     /**
-     * 健壮提取 Bearer Token。
-     * 支持 "Bearer xxx"、"bearer xxx"、纯 token 三种格式，兼容首尾空白。
+     * 从 Authorization header 中提取 token。
+     * @param authorizationHeader  Authorization header
+     * @return  token
      */
     private String extractToken(String authorizationHeader) {
         if (authorizationHeader == null || authorizationHeader.isBlank()) {

@@ -1,6 +1,7 @@
 package com.interviewcoach.websocket;
 
 import com.interviewcoach.service.AsrService;
+import com.interviewcoach.service.ConversationService;
 import com.interviewcoach.service.SpringAiService;
 import com.interviewcoach.service.TtsService;
 import jakarta.websocket.HandshakeResponse;
@@ -12,7 +13,6 @@ import org.springframework.web.context.support.WebApplicationContextUtils;
 
 /**
  * WebSocket Endpoint 配置器。
- * 通过 Spring ApplicationContext 获取 Bean，解决 JSR 356 Endpoint 无法使用依赖注入的问题。
  */
 @Slf4j
 public class WebSocketConfigurator extends ServerEndpointConfig.Configurator {
@@ -23,7 +23,12 @@ public class WebSocketConfigurator extends ServerEndpointConfig.Configurator {
         if (applicationContext == null) {
             synchronized (WebSocketConfigurator.class) {
                 if (applicationContext == null) {
-                    applicationContext = WebApplicationContextUtils.getRequiredWebApplicationContext(null);
+                    // 尝试从 ServletContext 获取，若失败则返回 null（后续会在 modifyHandshake 中设置）
+                    try {
+                        applicationContext = WebApplicationContextUtils.getWebApplicationContext(null);
+                    } catch (Exception e) {
+                        log.warn("[WS] 无法从 ServletContext 获取 ApplicationContext");
+                    }
                 }
             }
         }
@@ -67,6 +72,14 @@ public class WebSocketConfigurator extends ServerEndpointConfig.Configurator {
                     log.info("[WS] TtsService 注入成功");
                 } catch (Exception e) {
                     log.warn("[WS] TtsService 注入失败: {}", e.getMessage());
+                }
+
+                try {
+                    ConversationService conversationService = getApplicationContext().getBean(ConversationService.class);
+                    ws.setConversationService(conversationService);
+                    log.info("[WS] ConversationService 注入成功");
+                } catch (Exception e) {
+                    log.warn("[WS] ConversationService 注入失败: {}", e.getMessage());
                 }
             }
             return endpoint;

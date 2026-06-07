@@ -7,6 +7,7 @@ export interface WebSocketMessage {
   content: string;
   timestamp: number;
   sessionId?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface WebSocketConfig {

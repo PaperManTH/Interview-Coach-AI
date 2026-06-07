@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import type { ChatMessage } from '@/types/chat';
+import { useAuthStore } from '@/stores/authStore';
 import aiPng from '@/assets/chat_icon.png';
 
 defineProps<{ message: ChatMessage }>();
+const authStore = useAuthStore();
 </script>
 
 <template>
@@ -38,12 +40,17 @@ defineProps<{ message: ChatMessage }>();
         <p class="content">
           {{ message.content }}<span v-if="message.streaming" class="caret">▍</span>
         </p>
+        <!-- 中文翻译 -->
+        <p v-if="message.role === 'ai' && message.chinese" class="translation">
+          {{ message.chinese }}
+        </p>
       </div>
     </div>
 
     <!-- 用户头像（显示在右侧） -->
     <div v-if="message.role === 'user'" class="avatar-wrap user-avatar">
-      <span class="avatar-letter">Y</span>
+      <img v-if="authStore.avatarUrl" :src="authStore.avatarUrl" alt="User" class="user-img" />
+      <span v-else class="avatar-letter">{{ (authStore.username || 'Y').charAt(0).toUpperCase() }}</span>
     </div>
   </div>
 </template>
@@ -115,6 +122,12 @@ defineProps<{ message: ChatMessage }>();
   font-weight: 700;
   line-height: 1;
 }
+.user-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 10px;
+  object-fit: cover;
+}
 
 /* ============ 气泡容器 ============ */
 .bubble-wrap {
@@ -183,6 +196,17 @@ defineProps<{ message: ChatMessage }>();
 
 .content {
   margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.translation {
+  margin: 8px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid rgba(148, 163, 184, 0.15);
+  font-size: 13px;
+  line-height: 1.6;
+  color: #64748b;
   white-space: pre-wrap;
   word-break: break-word;
 }

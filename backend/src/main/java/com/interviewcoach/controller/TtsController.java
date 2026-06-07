@@ -20,6 +20,11 @@ public class TtsController {
 
     private final TtsService ttsService;
 
+    /**
+     * 语音合成。
+     * @param request  请求体，包含 text 和 userId 字段
+     * @return  Base64 编码的音频数据
+     */
     @PostMapping("/synthesize")
     public ResponseEntity<ApiResponse<String>> synthesize(@RequestBody Map<String, String> request) {
         String text = request.get("text");

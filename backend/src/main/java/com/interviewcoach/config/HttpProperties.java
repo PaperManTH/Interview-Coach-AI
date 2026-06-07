@@ -26,7 +26,7 @@ public class HttpProperties {
         /** 代理主机 */
         private String host;
 
-        /** 代理端口，默认 8080 */
-        private int port = 8080;
+        /** 代理端口，默认 7890 */
+        private int port = 7890;
     }
 }
