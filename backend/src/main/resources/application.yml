@@ -25,8 +25,8 @@ spring:
   datasource:
     url: jdbc:mysql://localhost:3306/interview_coach?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=UTF-8&allowPublicKeyRetrieval=true
     driver-class-name: com.mysql.cj.jdbc.Driver
-    username: ${MYSQL_USER:root}
-    password: ${MYSQL_PASSWORD:123}
+    username: ${MYSQL_USER:}
+    password: ${MYSQL_PASSWORD:}
 
 # MyBatis-Plus 配置
 mybatis-plus:
@@ -50,11 +50,11 @@ app:
   # ==== 认证 ====
   auth:
     # JWT 签名秘钥（生产环境通过环境变量注入）
-    jwt-secret: ${JWT_SECRET:interview-coach-jwt-secret-key-32bytes!}
+    jwt-secret: ${JWT_SECRET:}
     # GitHub OAuth2
     github:
-      client-id: ${GITHUB_CLIENT_ID:Ov23lia0zkgygySP2hjh}
-      client-secret: ${GITHUB_CLIENT_SECRET:d874d80bfd40d3640e8d2ab2559e973abff0da5d}
+      client-id: ${GITHUB_CLIENT_ID:}
+      client-secret: ${GITHUB_CLIENT_SECRET:}
 
   # ---- HTTP 客户端 ----
   http:

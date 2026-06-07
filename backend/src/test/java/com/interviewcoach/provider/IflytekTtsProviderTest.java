@@ -11,7 +11,7 @@ public class IflytekTtsProviderTest {
     private static final String TEST_TEXT_CN = "你好，欢迎使用讯飞超拟人语音合成服务。";
     private static final String TEST_TEXT_EN = "Hello, welcome to iFlytek Super TTS Service.";
     
-    private static final String COMBINED_KEY = "dc4634b7:236f94aeb93bf2be36af835f6c9d0935:ZTUxZmMwYWY3OTQ1ZDZjNWVhY2E2MmZh";
+    private static final String COMBINED_KEY = System.getenv().getOrDefault("IFLYTEK_COMBINED_KEY", "appId:apiKey:apiSecret");
 
     @Test
     public void testSuperHumanChineseVoiceSynthesis() throws Exception {
@@ -166,8 +166,8 @@ public class IflytekTtsProviderTest {
         
         String host = "cbm01.cn-huabei-1.xf-yun.com";
         String path = "/v1/private/mcd9m97e6";
-        String apiKey = "236f94aeb93bf2be36af835f6c9d0935";
-        String apiSecret = "ZTUxZmMwYWY3OTQ1ZDZjNWVhY2E2MmZh";
+        String apiKey = System.getenv().getOrDefault("IFLYTEK_API_KEY", "your-api-key");
+        String apiSecret = System.getenv().getOrDefault("IFLYTEK_API_SECRET", "your-api-secret");
         
         java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat(
                 "EEE, dd MMM yyyy HH:mm:ss 'GMT'", java.util.Locale.US);
@@ -210,9 +210,9 @@ public class IflytekTtsProviderTest {
         
         String host = "cbm01.cn-huabei-1.xf-yun.com";
         String path = "/v1/private/mcd9m97e6";
-        String apiKey = "236f94aeb93bf2be36af835f6c9d0935";
-        String apiSecret = "ZTUxZmMwYWY3OTQ1ZDZjNWVhY2E2MmZh";
-        String appId = "dc4634b7";
+        String apiKey = System.getenv().getOrDefault("IFLYTEK_API_KEY", "your-api-key");
+        String apiSecret = System.getenv().getOrDefault("IFLYTEK_API_SECRET", "your-api-secret");
+        String appId = System.getenv().getOrDefault("IFLYTEK_APP_ID", "your-app-id");
         
         java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat(
                 "EEE, dd MMM yyyy HH:mm:ss 'GMT'", java.util.Locale.US);
