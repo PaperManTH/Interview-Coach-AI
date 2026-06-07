@@ -81,24 +81,17 @@ public class InterviewWsEndpoint {
         session.getUserProperties().put(WebSocketSessionManager.KEY_USER_ID, userId);
         sessionManager.register(session);
         
-        // 创建数据库会话记录（用于消息持久化）
+        // 创建数据库会话记录（每次新连接创建新会话，避免记忆混乱）
         String dbSessionId = null;
         log.info("[WS] conversationService = {}", conversationService);
         if (conversationService != null) {
             try {
-                // 先检查用户是否已有活跃会话，如果有则复用
-                InterviewSession existingSession = conversationService.getActiveSession(userId);
-                if (existingSession != null) {
-                    dbSessionId = existingSession.getSessionId();
-                    log.info("[WS] 复用用户活跃会话: dbSessionId={}, userId={}", dbSessionId, userId);
-                } else {
-                    InterviewSession dbSession = conversationService.createSession(userId, Constants.INTERVIEW_TYPE_DYNAMIC);
-                    dbSessionId = dbSession.getSessionId();
-                    log.info("[WS] 数据库会话创建成功: dbSessionId={}, userId={}", dbSessionId, userId);
-                }
+                InterviewSession dbSession = conversationService.createSession(userId, Constants.INTERVIEW_TYPE_DYNAMIC);
+                dbSessionId = dbSession.getSessionId();
                 session.getUserProperties().put("dbSessionId", dbSessionId);
+                log.info("[WS] 数据库会话创建成功: dbSessionId={}, userId={}", dbSessionId, userId);
             } catch (Exception e) {
-                log.error("[WS] 数据库会话创建/复用失败", e);
+                log.error("[WS] 数据库会话创建失败", e);
             }
         } else {
             log.warn("[WS] conversationService 为 null，无法创建数据库会话");
@@ -232,10 +225,6 @@ public class InterviewWsEndpoint {
                 .build();
         sendMessage(session, userMsg);
 
-        // 1.5 持久化用户消息（使用数据库会话ID）
-        log.info("[WS-Persistence] 保存用户消息: messageId={}, dbSessionId={}", userMsg.getId(), dbSessionId);
-        saveMessageToDatabase(dbSessionId, userId, userMsg.getId(), InterviewConstants.SENDER_USER, "text", userMessage);
-
         // 2. 生成 AI 双语回复（传递原始 msg 以提取动态模式 metadata）
         BilingualResponse aiResponse;
         try {
@@ -244,6 +233,10 @@ public class InterviewWsEndpoint {
             log.error("[WS] AI 服务调用失败，使用降级回复: {}", e.getMessage());
             aiResponse = BilingualResponse.fallback();
         }
+
+        // 2.1 持久化用户消息（AI 调用之后，避免 loadConversationHistory 加载当前消息）
+        log.info("[WS-Persistence] 保存用户消息: messageId={}, dbSessionId={}", userMsg.getId(), dbSessionId);
+        saveMessageToDatabase(dbSessionId, userId, userMsg.getId(), InterviewConstants.SENDER_USER, "text", userMessage);
 
         // 3. 构建双语消息发送给前端
         Map<String, Object> bilingualContent = new HashMap<>();

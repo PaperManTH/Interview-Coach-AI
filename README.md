@@ -46,7 +46,7 @@ Interview Coach AI 是一个基于人工智能的全栈面试训练平台，通�
 
 ### 2. 语音交互系统
 
-- **语音识别 (ASR)**：支持讯飞、OpenAI Whisper 等多种引擎
+- **语音识别 (ASR)**：支持讯飞引擎
 - **语音合成 (TTS)**：支持多语种、多音色的高质量语音输出
 - **实时对话**：WebSocket 实现低延迟的双向通信
 
@@ -176,7 +176,7 @@ app:
 
 1. 访问 [GitHub Developer Settings](https://github.com/settings/developers)
 2. 创建新的 OAuth App
-3. 设置回调 URL: `http://localhost:5173/login/callback`
+3. 设置回调(本地测试) URL: `http://localhost:5173/login/callback`
 4. 将 Client ID 和 Secret 填入配置文件
 
 #### 3.3 构建并启动后端
@@ -295,156 +295,6 @@ npm run build
 
 ---
 
-## 📡 API 文档
-
-### 认证接口
-
-#### GitHub OAuth 登录
-
-```http
-POST /api/auth/login/github
-Content-Type: application/x-www-form-urlencoded
-
-code=<github_auth_code>&state=<csrf_state>
-```
-
-响应：
-```json
-{
-  "code": 200,
-  "message": "success",
-  "data": {
-    "userId": "github_123456",
-    "username": "john_doe",
-    "avatarUrl": "https://avatars.githubusercontent.com/u/123456?v=4",
-    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-  }
-}
-```
-
-#### 获取当前用户信息
-
-```http
-GET /api/auth/me
-Authorization: Bearer <jwt_token>
-```
-
-### 用户配置接口
-
-#### 获取配置
-
-```http
-GET /api/user-config/{userId}
-Authorization: Bearer <jwt_token>
-```
-
-#### 保存配置
-
-```http
-POST /api/user-config/{userId}
-Authorization: Bearer <jwt_token>
-Content-Type: application/json
-
-{
-  "llmType": "openai",
-  "llmApiKey": "sk-xxx",
-  "llmModel": "gpt-4o-mini",
-  "asrType": "iflytek",
-  "asrApiKey": "appid:key:secret",
-  "ttsType": "openai",
-  "ttsApiKey": "sk-xxx",
-  "ttsVoice": "alloy"
-}
-```
-
-### 简历接口
-
-#### 上传简历
-
-```http
-POST /api/resume/upload
-Authorization: Bearer <jwt_token>
-Content-Type: multipart/form-data
-
-file=<resume_file>
-```
-
-响应：
-```json
-{
-  "code": 200,
-  "data": {
-    "id": 1,
-    "fileName": "resume.pdf",
-    "parsedData": {
-      "skills": ["Java", "Spring Boot", "MySQL"],
-      "experience": [...],
-      "projects": [...]
-    }
-  }
-}
-```
-
-### 会话接口
-
-#### 创建会话
-
-```http
-POST /api/conversation/session
-Authorization: Bearer <jwt_token>
-Content-Type: application/json
-
-{
-  "interviewType": "dynamic",
-  "focus": "technical"
-}
-```
-
-#### 获取会话历史
-
-```http
-GET /api/conversation/history?page=1&pageSize=20
-Authorization: Bearer <jwt_token>
-```
-
-### WebSocket 接口
-
-#### 连接 WebSocket
-
-```javascript
-const ws = new WebSocket('ws://localhost:8080/ws/interview');
-
-ws.onopen = () => {
-  // 发送认证消息
-  ws.send(JSON.stringify({
-    type: 'AUTH',
-    token: 'your_jwt_token',
-    sessionId: 'session_uuid'
-  }));
-};
-
-ws.onmessage = (event) => {
-  const message = JSON.parse(event.data);
-  console.log('收到消息:', message);
-};
-
-// 发送用户消息
-ws.send(JSON.stringify({
-  type: 'TEXT',
-  content: '你好，我想练习技术面试',
-  sender: 'user'
-}));
-```
-
-消息类型：
-- `AUTH`: 认证消息
-- `TEXT`: 文本消息
-- `AUDIO`: 音频消息（Base64 编码）
-- `HEARTBEAT`: 心跳包
-- `ACK`: 确认消息
-
----
-
 ## ❓ 常见问题 (FAQ)
 
 ### Q1: Mock 模式和真实 API 有什么区别？
@@ -457,8 +307,8 @@ ws.send(JSON.stringify({
 
 **A:**
 - **LLM**: OpenAI、DeepSeek、Azure OpenAI、通义千问等（兼容 OpenAI API 格式的都支持）
-- **ASR**: 讯飞语音
-- **TTS**: 讯飞语音
+- **ASR**: 讯飞语音 (目前仅实现 多语种识别)
+- **TTS**: 讯飞语音 (目前仅实现 超拟人语音合成)
 
 ### Q3: 如何配置自定义 API 地址？
 
@@ -491,26 +341,7 @@ ws.send(JSON.stringify({
 
 默认保留 30 天，可通过配置 `app.interview.conversation.retention-days` 调整。
 
-### Q7: 如何部署到生产环境？
-
-**A:**
-1. **后端**: 
-   ```bash
-   mvn clean package -DskipTests
-   java -jar target/interview-coach-ai.jar --spring.profiles.active=prod
-   ```
-
-2. **前端**:
-   ```bash
-   npm run build
-   # 将 dist/ 目录部署到 Nginx 或其他静态服务器
-   ```
-
-3. **配置 HTTPS**（推荐）
-4. **配置反向代理**（Nginx/Apache）
-5. **设置环境变量**管理敏感信息
-
-### Q8: 遇到 402/429/401 错误怎么办？
+### Q7: 遇到 402/429/401 错误怎么办？
 
 **A:**
 - **402**: API 余额不足，请充值或切换服务商
@@ -518,43 +349,6 @@ ws.send(JSON.stringify({
 - **401/403**: API Key 无效，检查配置是否正确
 
 系统会自动降级到 Mock 模式保证可用性。
-
----
-
-## 🤝 贡献指南
-
-我们欢迎任何形式的贡献！在提交 PR 之前，请阅读以下指南：
-
-### 开发流程
-
-1. **Fork 本仓库**
-2. **创建特性分支**: `git checkout -b feature/amazing-feature`
-3. **提交更改**: `git commit -m 'Add some amazing feature'`
-4. **推送到分支**: `git push origin feature/amazing-feature`
-5. **提交 Pull Request**
-
-### 代码规范
-
-- **后端**: 遵循 [阿里巴巴 Java 开发手册](https://github.com/alibaba/p3c)
-- **前端**: 遵循 Vue.js 官方风格指南，使用 ESLint + Prettier
-- **提交信息**: 使用语义化提交信息（如 `feat:`, `fix:`, `docs:` 等）
-
-### 分支策略
-
-- `main`: 主分支，保持稳定
-- `develop`: 开发分支
-- `feature/*`: 特性分支
-- `hotfix/*`: 紧急修复分支
-
-### 测试要求
-
-- 新增功能需包含单元测试
-- 确保所有测试通过: `mvn test` (后端), `npm test` (前端)
-- 保持测试覆盖率 > 70%
-
-### 文档更新
-
-如果修改影响了用户使用，请同步更新相关文档。
 
 ---
 
@@ -573,13 +367,6 @@ ws.send(JSON.stringify({
 - [Spring AI](https://spring.io/projects/spring-ai)
 - [MyBatis-Plus](https://baomidou.com/)
 - [Apache PDFBox](https://pdfbox.apache.org/)
-
----
-
-## 📞 联系方式
-
-- **Issues**: [GitHub Issues](https://github.com/your-repo/Interview-Coach-AI/issues)
-- **Email**: your-email@example.com
 
 ---
 

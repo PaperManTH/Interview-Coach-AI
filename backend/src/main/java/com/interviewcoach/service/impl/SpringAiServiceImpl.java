@@ -15,6 +15,7 @@ import com.interviewcoach.tools.ResumeTool;
 import com.interviewcoach.utils.BilingualResponseParser;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
@@ -362,7 +363,7 @@ public class SpringAiServiceImpl implements SpringAiService {
                     messages.add(new UserMessage(msg.getContent()));
                     loaded++;
                 } else if ("assistant".equalsIgnoreCase(msg.getSender()) || "ai".equalsIgnoreCase(msg.getSender())) {
-                    messages.add(new SystemMessage(msg.getContent()));
+                    messages.add(new AssistantMessage(msg.getContent()));
                     loaded++;
                 }
             }
