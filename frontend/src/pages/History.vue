@@ -8,7 +8,7 @@
  * - 支持删除会话
  * - 支持分页加载
  */
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, onActivated, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/authStore';
 import {
@@ -54,9 +54,13 @@ const interviewTypeLabel = computed(() => {
 const statusLabel = computed(() => {
   const labels: Record<string, { text: string; class: string }> = {
     active: { text: '进行中', class: 'status-active' },
+    paused: { text: '已暂停', class: 'status-paused' },
     ended: { text: '已结束', class: 'status-ended' },
   };
-  return (status: string) => labels[status] || { text: status, class: '' };
+  return (status: string) => {
+    const normalized = String(status).toLowerCase();
+    return labels[normalized] || { text: status, class: '' };
+  };
 });
 
 const formatDate = (dateStr: string | null) => {
@@ -73,7 +77,6 @@ const formatDate = (dateStr: string | null) => {
 
 const formatDuration = (session: InterviewSession) => {
   if (session.endedAt) {
-    // 已结束的会话：使用开始和结束时间
     const start = new Date(session.startedAt).getTime();
     const end = new Date(session.endedAt).getTime();
     const diff = Math.floor((end - start) / 1000);
@@ -82,21 +85,26 @@ const formatDuration = (session: InterviewSession) => {
     return `共 ${minutes}分${seconds}秒`;
   }
   
-  // 未结束但已暂停的会话：使用暂停时间作为结束时间
   const start = new Date(session.startedAt).getTime();
-  const end = session.pausedAt 
-    ? new Date(session.pausedAt).getTime()
-    : Date.now();
+  const status = String(session.status).toLowerCase();
+  
+  // 已暂停的会话：使用暂停时间作为结束时间，时间固定不变
+  if (status === 'paused' && session.pausedAt) {
+    const end = new Date(session.pausedAt).getTime();
+    const diff = Math.floor((end - start) / 1000);
+    if (diff < 0) return '-';
+    const minutes = Math.floor(diff / 60);
+    const seconds = diff % 60;
+    return `暂停于 ${minutes}分${seconds}秒`;
+  }
+  
+  // 进行中的会话：使用当前时间
+  const end = Date.now();
   const diff = Math.floor((end - start) / 1000);
   if (diff < 0) return '-';
   const minutes = Math.floor(diff / 60);
   const seconds = diff % 60;
-  
-  if (session.pausedAt) {
-    return `暂停于 ${minutes}分${seconds}秒`;
-  } else {
-    return `已进行 ${minutes}分${seconds}秒`;
-  }
+  return `已进行 ${minutes}分${seconds}秒`;
 };
 
 // ===== 方法 =====
@@ -107,6 +115,10 @@ async function loadSessions() {
     const response = await getSessionList(auth.userId || 'anonymous', currentPage.value, pageSize.value);
     if (response.success) {
       sessions.value = response.data || [];
+      // 调试：打印每个会话的状态
+      sessions.value.forEach((s: any, i: number) => {
+        console.log(`[History] 会话${i}: status=${s.status}, currentStage=${s.currentStage}, stageRound=${s.stageRound}, totalRounds=${s.totalRounds}`);
+      });
       const total = Number(response.total);
       totalSessions.value = Number.isFinite(total) && total > 0 ? total : sessions.value.length;
     } else {
@@ -195,8 +207,26 @@ function parseMetadata(metadata: string | null): { chinese?: string; english?: s
   }
 }
 
+let refreshTimer: number | null = null;
+
 onMounted(() => {
   loadSessions();
+  // 每5秒刷新一次会话列表，以便及时更新状态变化
+  refreshTimer = window.setInterval(() => {
+    loadSessions();
+  }, 5000);
+});
+
+// 页面激活时刷新会话列表（从面试页返回时会触发）
+onActivated(() => {
+  loadSessions();
+});
+
+onUnmounted(() => {
+  if (refreshTimer) {
+    clearInterval(refreshTimer);
+    refreshTimer = null;
+  }
 });
 </script>
 
@@ -271,7 +301,7 @@ onMounted(() => {
                   </span>
                   <span class="session-duration">{{ formatDuration(session) }}</span>
                   <button
-                    v-if="session.status === 'active'"
+                    v-if="['active', 'paused'].includes(String(session.status).toLowerCase())"
                     class="resume-btn"
                     @click.stop="resumeSession(session)"
                     title="继续此面试"
@@ -573,6 +603,7 @@ onMounted(() => {
   font-weight: 600;
 }
 .status-active { background: rgba(16, 185, 129, 0.15); color: #059669; }
+.status-paused { background: rgba(251, 191, 36, 0.15); color: #d97706; }
 .status-ended { background: rgba(148, 163, 184, 0.15); color: #64748b; }
 .session-duration { font-size: 12px; color: #94a3b8; }
 .resume-btn {
@@ -625,7 +656,16 @@ onMounted(() => {
   border: 1px solid rgba(148, 163, 184, 0.2);
   display: flex;
   flex-direction: column;
-  min-height: 500px;
+  height: calc(100vh - 300px);
+  max-height: 600px;
+  min-height: 400px;
+}
+
+.detail-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 .detail-empty {
   flex: 1;
@@ -637,7 +677,6 @@ onMounted(() => {
 }
 .detail-empty p { margin-top: 12px; font-size: 14px; }
 
-.detail-content { flex: 1; display: flex; flex-direction: column; }
 .detail-header {
   display: flex;
   align-items: center;
@@ -679,6 +718,7 @@ onMounted(() => {
   flex: 1;
   overflow-y: auto;
   padding: 16px 20px;
+  max-height: calc(100vh - 380px);
 }
 .message-item {
   display: flex;

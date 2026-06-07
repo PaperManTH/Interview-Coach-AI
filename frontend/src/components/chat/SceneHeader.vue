@@ -3,6 +3,7 @@ import { useRouter } from 'vue-router';
 import { computed } from 'vue';
 import { getSceneMeta, getStageMeta, INTERVIEW_STAGES } from '@/types/scene';
 import type { InterviewStage } from '@/types/scene';
+import { useInterviewStore } from '@/stores/interviewStore';
 import voiceIcon from '@/assets/voice_icon.png';
 import homePng from '@/assets/hr_Interview.png';
 
@@ -11,9 +12,11 @@ const props = defineProps<{
   isDynamic?: boolean;
   currentStage?: InterviewStage | null;
   stageProgress?: number;
+  stageRound?: number;
 }>();
 
 const router = useRouter();
+const store = useInterviewStore();
 
 const meta = computed(() => (props.sceneKey ? getSceneMeta(props.sceneKey) : undefined));
 const accent = computed(() => {
@@ -42,8 +45,33 @@ const dynamicSubtitle = computed(() => {
   return stageMeta?.descriptionZh ?? '动态面试流程';
 });
 
-function goBack() {
+async function goBack() {
+  try {
+    await store.pauseCurrentSession();
+  } catch (e) {
+    // ignore
+  }
   router.push('/');
+}
+
+const ROUNDS_PER_STAGE = 3;
+
+function isStageCompleted(stageIndex: number): boolean {
+  if (!props.currentStage) return false;
+  
+  const currentStageIndex = INTERVIEW_STAGES.findIndex(s => s.key === props.currentStage);
+  
+  // 如果当前阶段索引大于要判断的阶段索引，说明该阶段已完成
+  if (currentStageIndex > stageIndex) {
+    return true;
+  }
+  
+  // 如果是当前阶段，需要检查轮次是否完成
+  if (currentStageIndex === stageIndex) {
+    return props.stageRound !== undefined && props.stageRound >= ROUNDS_PER_STAGE;
+  }
+  
+  return false;
 }
 </script>
 
@@ -71,7 +99,7 @@ function goBack() {
               class="stage-dot"
               :class="{
                 active: currentStage === stage.key,
-                completed: !currentStage || INTERVIEW_STAGES.findIndex(s => s.key === currentStage) > idx
+                completed: isStageCompleted(idx)
               }"
               :style="{ '--dot-accent': stage.accent }"
               :title="stage.label + ' - ' + stage.labelZh"

@@ -54,6 +54,7 @@ watch(() => route.params.scene, (scene) => {
         :is-dynamic="isDynamicMode"
         :current-stage="store.currentStage"
         :stage-progress="store.stageProgress"
+        :stage-round="store.stageRound"
       />
       <ChatMessageList :messages="store.messages" />
       <StatusBar :status="store.status" :is-mic-active="store.isMicActive" />

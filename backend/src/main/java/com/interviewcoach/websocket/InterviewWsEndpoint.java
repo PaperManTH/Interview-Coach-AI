@@ -99,6 +99,24 @@ public class InterviewWsEndpoint {
         }
         
         log.info("[WS] 连接建立 websocketSessionId={}, userId={}, dbSessionId={}", websocketSessionId, userId, dbSessionId);
+
+        // 把真实 dbSessionId 传回前端，确保前端 pauseSession 使用的 ID 与数据库一致
+        if (dbSessionId != null) {
+            Map<String, Object> meta = new HashMap<>();
+            meta.put("dbSessionId", dbSessionId);
+            MessageDTO initMsg = MessageDTO.builder()
+                    .id(UUID.randomUUID().toString())
+                    .type(MessageType.SESSION_INIT)
+                    .sender("system")
+                    .content(dbSessionId)
+                    .metadata(meta)
+                    .timestamp(System.currentTimeMillis())
+                    .sessionId(dbSessionId)
+                    .build();
+            sendMessage(session, initMsg);
+            log.info("[WS] 已发送 SESSION_INIT: dbSessionId={}", dbSessionId);
+        }
+
         sendWelcomeMessage(session, userId);
     }
 
@@ -138,8 +156,9 @@ public class InterviewWsEndpoint {
             MessageDTO msg = MessageCodec.deserialize(message);
             handleMessage(session, msg);
         } catch (Exception e) {
-            log.warn("[WS] 消息解析失败: {}", e.getMessage());
-            sendError(session, "消息格式错误");
+            log.error("[WS] 消息处理失败: {}", e.getMessage(), e);
+            sendError(session, "消息处理错误: " + e.getMessage());
+            // 不关闭连接，允许继续通信
         }
     }
 
@@ -170,28 +189,31 @@ public class InterviewWsEndpoint {
     }
 
     private void handleTextMessage(Session session, MessageDTO msg) {
-        String userMessage = msg.getContent();
-        String userId = getUserId(session);
-        String websocketSessionId = session.getId();
-        String dbSessionId = (String) session.getUserProperties().get("dbSessionId");
-        log.info("[WS] 收到消息 websocketSessionId={}, dbSessionId={}, userId={}, content={}", websocketSessionId, dbSessionId, userId, userMessage);
+        try {
+            String userMessage = msg.getContent();
+            String userId = getUserId(session);
+            String websocketSessionId = session.getId();
+            String dbSessionId = (String) session.getUserProperties().get("dbSessionId");
+            log.info("[WS] 收到消息 websocketSessionId={}, dbSessionId={}, userId={}, content={}", websocketSessionId, dbSessionId, userId, userMessage);
+            log.info("[WS-Debug] msg.metadata={}, msg.sessionId={}", msg.getMetadata(), msg.getSessionId());
 
-        // 如果 dbSessionId 为空，动态创建数据库会话
-        if ((dbSessionId == null || dbSessionId.isEmpty()) && conversationService != null) {
-            try {
-                InterviewSession existingSession = conversationService.getActiveSession(userId);
-                if (existingSession != null) {
-                    dbSessionId = existingSession.getSessionId();
-                } else {
-                    InterviewSession dbSession = conversationService.createSession(userId, "dynamic");
-                    dbSessionId = dbSession.getSessionId();
+            // 如果 dbSessionId 为空，动态创建数据库会话
+            if ((dbSessionId == null || dbSessionId.isEmpty()) && conversationService != null) {
+                try {
+                    InterviewSession existingSession = conversationService.getActiveSession(userId);
+                    if (existingSession != null) {
+                        dbSessionId = existingSession.getSessionId();
+                    } else {
+                        InterviewSession dbSession = conversationService.createSession(userId, "dynamic");
+                        dbSessionId = dbSession.getSessionId();
+                    }
+                    session.getUserProperties().put("dbSessionId", dbSessionId);
+                    log.info("[WS] 动态创建/复用会话: dbSessionId={}", dbSessionId);
+                } catch (Exception e) {
+                    log.error("[WS] 动态创建会话失败: {}", e.getMessage(), e);
+                    // 继续处理，不中断流程
                 }
-                session.getUserProperties().put("dbSessionId", dbSessionId);
-                log.info("[WS] 动态创建/复用会话: dbSessionId={}", dbSessionId);
-            } catch (Exception e) {
-                log.warn("[WS] 动态创建会话失败: {}", e.getMessage());
             }
-        }
 
         // 1. 先将用户消息回传给前端（让用户看到自己发送的消息）
         MessageDTO userMsg = MessageDTO.builder()
@@ -215,6 +237,81 @@ public class InterviewWsEndpoint {
         Map<String, Object> bilingualContent = new HashMap<>();
         bilingualContent.put("chinese", aiResponse.getChinese());
         bilingualContent.put("english", aiResponse.getEnglish());
+        
+        // 从消息 metadata 或 sessionId(JSON) 中提取当前阶段信息并保存
+        String currentStage = "warmup";
+        // 1. 先尝试从 metadata 获取
+        if (msg != null && msg.getMetadata() != null) {
+            Object stageObj = msg.getMetadata().get("stage");
+            if (stageObj != null) {
+                currentStage = String.valueOf(stageObj);
+                log.info("[WS-Stage] 从 metadata 获取阶段(文本消息): {}", currentStage);
+            }
+        }
+        // 2. 再尝试从 sessionId 解析 JSON（兼容旧方式）
+        if ("warmup".equals(currentStage) && msg != null && msg.getSessionId() != null) {
+            try {
+                String sessionIdStr = msg.getSessionId();
+                if (sessionIdStr.startsWith("{") && sessionIdStr.contains("stage")) {
+                    com.fasterxml.jackson.databind.JsonNode jsonNode = MessageCodec.parseJson(sessionIdStr);
+                    if (jsonNode.has("stage")) {
+                        currentStage = jsonNode.get("stage").asText();
+                        log.info("[WS-Stage] 从 sessionId JSON 获取阶段(文本消息): {}", currentStage);
+                    }
+                }
+            } catch (Exception e) {
+                log.debug("[WS-Stage] 从 sessionId 解析阶段失败(文本消息): {}", e.getMessage());
+            }
+        }
+        bilingualContent.put("stage", currentStage);
+
+        // 3.2 更新数据库会话的阶段进度（用于恢复时使用）
+        log.info("[WS-Stage-Debug] dbSessionId={}, conversationService={}, metadata={}", 
+                dbSessionId, conversationService != null ? "存在" : "null", msg.getMetadata());
+        if (dbSessionId != null && !dbSessionId.isEmpty() && conversationService != null) {
+            try {
+                // 从 metadata 或 sessionId 中解析 stageRound 和 totalRounds
+                int parsedStageRound = 0;
+                int parsedTotalRounds = 0;
+                log.info("[WS-Stage-Debug] 开始解析阶段信息: metadata={}", msg.getMetadata());
+                if (msg != null && msg.getMetadata() != null) {
+                    Object roundObj = msg.getMetadata().get("stageRound");
+                    Object totalObj = msg.getMetadata().get("totalRounds");
+                    Object stageObj = msg.getMetadata().get("stage");
+                    log.info("[WS-Stage-Debug] 从metadata获取: stage={}, stageRound={}, totalRounds={}", 
+                            stageObj, roundObj, totalObj);
+                    if (roundObj != null) {
+                        parsedStageRound = Integer.parseInt(roundObj.toString());
+                    }
+                    if (totalObj != null) {
+                        parsedTotalRounds = Integer.parseInt(totalObj.toString());
+                    }
+                } else if (msg != null && msg.getSessionId() != null && msg.getSessionId().startsWith("{")) {
+                    try {
+                        com.fasterxml.jackson.databind.JsonNode jsonNode = MessageCodec.parseJson(msg.getSessionId());
+                        if (jsonNode.has("stageRound")) {
+                            parsedStageRound = jsonNode.get("stageRound").asInt();
+                        }
+                        if (jsonNode.has("totalRounds")) {
+                            parsedTotalRounds = jsonNode.get("totalRounds").asInt();
+                        }
+                        log.info("[WS-Stage-Debug] 从sessionId JSON获取: stageRound={}, totalRounds={}", 
+                                parsedStageRound, parsedTotalRounds);
+                    } catch (Exception e) {
+                        log.debug("[WS-Stage] 从 sessionId 解析轮次失败: {}", e.getMessage());
+                    }
+                }
+                log.info("[WS-Stage-Debug] 准备更新数据库: sessionId={}, stage={}, round={}, total={}", 
+                        dbSessionId, currentStage, parsedStageRound, parsedTotalRounds);
+                boolean updated = conversationService.updateStageProgress(dbSessionId, currentStage, parsedStageRound, parsedTotalRounds);
+                log.info("[WS-Stage-Debug] 更新结果: {}", updated ? "成功" : "失败");
+            } catch (Exception e) {
+                log.warn("[WS-Stage] 更新会话阶段进度失败: {}", e.getMessage(), e);
+            }
+        } else {
+            log.warn("[WS-Stage-Debug] 无法更新阶段进度: dbSessionId={}, conversationService={}", 
+                    dbSessionId, conversationService != null ? "存在" : "null");
+        }
 
         MessageDTO reply = MessageDTO.builder()
                 .id(UUID.randomUUID().toString())
@@ -245,6 +342,10 @@ public class InterviewWsEndpoint {
             log.debug("[WS-TTS] 跳过语音合成（响应疑似降级/错误提示）");
         } else {
             synthesizeAndSend(session, userId, englishText);
+        }
+        } catch (Exception e) {
+            log.error("[WS] handleTextMessage 处理失败: {}", e.getMessage(), e);
+            sendError(session, "处理消息时发生错误");
         }
     }
 
@@ -400,6 +501,67 @@ public class InterviewWsEndpoint {
         Map<String, Object> bilingualContent = new HashMap<>();
         bilingualContent.put("chinese", aiResponse.getChinese());
         bilingualContent.put("english", aiResponse.getEnglish());
+        
+        // 从消息 metadata 或 sessionId(JSON) 中提取当前阶段信息并保存
+        String currentStage = "warmup";
+        // 1. 先尝试从 metadata 获取
+        if (msg != null && msg.getMetadata() != null) {
+            Object stageObj = msg.getMetadata().get("stage");
+            if (stageObj != null) {
+                currentStage = String.valueOf(stageObj);
+                log.info("[WS-Stage] 从 metadata 获取阶段(语音消息): {}", currentStage);
+            }
+        }
+        // 2. 再尝试从 sessionId 解析 JSON（兼容旧方式）
+        if ("warmup".equals(currentStage) && msg != null && msg.getSessionId() != null) {
+            try {
+                String sessionIdStr = msg.getSessionId();
+                if (sessionIdStr.startsWith("{") && sessionIdStr.contains("stage")) {
+                    com.fasterxml.jackson.databind.JsonNode jsonNode = MessageCodec.parseJson(sessionIdStr);
+                    if (jsonNode.has("stage")) {
+                        currentStage = jsonNode.get("stage").asText();
+                        log.info("[WS-Stage] 从 sessionId JSON 获取阶段(语音消息): {}", currentStage);
+                    }
+                }
+            } catch (Exception e) {
+                log.debug("[WS-Stage] 从 sessionId 解析阶段失败(语音消息): {}", e.getMessage());
+            }
+        }
+        bilingualContent.put("stage", currentStage);
+
+        // 更新数据库会话的阶段进度
+        String dbSessionId = (String) session.getUserProperties().get("dbSessionId");
+        if (dbSessionId != null && !dbSessionId.isEmpty() && conversationService != null) {
+            try {
+                int parsedStageRound = 0;
+                int parsedTotalRounds = 0;
+                if (msg != null && msg.getMetadata() != null) {
+                    Object roundObj = msg.getMetadata().get("stageRound");
+                    Object totalObj = msg.getMetadata().get("totalRounds");
+                    if (roundObj != null) {
+                        parsedStageRound = Integer.parseInt(roundObj.toString());
+                    }
+                    if (totalObj != null) {
+                        parsedTotalRounds = Integer.parseInt(totalObj.toString());
+                    }
+                } else if (msg != null && msg.getSessionId() != null && msg.getSessionId().startsWith("{")) {
+                    try {
+                        com.fasterxml.jackson.databind.JsonNode jsonNode = MessageCodec.parseJson(msg.getSessionId());
+                        if (jsonNode.has("stageRound")) {
+                            parsedStageRound = jsonNode.get("stageRound").asInt();
+                        }
+                        if (jsonNode.has("totalRounds")) {
+                            parsedTotalRounds = jsonNode.get("totalRounds").asInt();
+                        }
+                    } catch (Exception e) {
+                        log.debug("[WS-Stage] 从 sessionId 解析轮次失败(语音消息): {}", e.getMessage());
+                    }
+                }
+                conversationService.updateStageProgress(dbSessionId, currentStage, parsedStageRound, parsedTotalRounds);
+            } catch (Exception e) {
+                log.warn("[WS-Stage] 更新会话阶段进度失败(语音消息): {}", e.getMessage());
+            }
+        }
 
         MessageDTO reply = MessageDTO.builder()
                 .id(UUID.randomUUID().toString())

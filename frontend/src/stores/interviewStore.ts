@@ -10,6 +10,7 @@ import { useAuthStore } from '@/stores/authStore';
 import {
   getSessionDetail,
   getSessionMessages,
+  pauseSession,
   type InterviewMessage,
 } from '@/services/conversationApi';
 
@@ -139,6 +140,25 @@ export const useInterviewStore = defineStore('interview', {
       this.connectWebSocket();
     },
 
+    /** 暂停当前会话（用户点击退出/返回时调用） */
+    async pauseCurrentSession(): Promise<void> {
+      const sid = this.sessionId;
+      console.log('[Interview] 准备暂停会话, sessionId=', sid);
+      if (!sid) {
+        console.log('[Interview] 无 sessionId，跳过暂停');
+        return;
+      }
+      try {
+        const result = await pauseSession(sid);
+        console.log('[Interview] 会话暂停结果:', sid, result);
+        if (!result.success) {
+          console.warn('[Interview] 暂停会话失败，sessionId可能不正确:', sid);
+        }
+      } catch (e) {
+        console.error('[Interview] 暂停会话异常:', e);
+      }
+    },
+
     /** 恢复一个已有的会话（在"继续"按钮被点击时调用） */
     async resumeSession(sessionId: string) {
       this._initCore();
@@ -162,11 +182,28 @@ export const useInterviewStore = defineStore('interview', {
             this.isDynamicMode = false;
             this.scene = type;
           }
+          // 优先从会话数据中直接读取阶段信息（最可靠）
+          if (sessionResp.session.currentStage) {
+            this.currentStage = sessionResp.session.currentStage as InterviewStage;
+            console.log('[Store] 从会话数据恢复阶段:', this.currentStage);
+          }
+          if (sessionResp.session.stageRound != null) {
+            this.stageRound = Number(sessionResp.session.stageRound);
+            console.log('[Store] 从会话数据恢复阶段轮次:', this.stageRound);
+          }
+          if (sessionResp.session.totalRounds != null) {
+            this.totalRounds = Number(sessionResp.session.totalRounds);
+            console.log('[Store] 从会话数据恢复总轮次:', this.totalRounds);
+          }
         }
         if (msgResp?.success && Array.isArray(msgResp.data)) {
-          for (const m of msgResp.data as InterviewMessage[]) {
+          let savedStage: string | undefined;
+          
+          for (let i = 0; i < msgResp.data.length; i++) {
+            const m = msgResp.data[i] as InterviewMessage;
             let content = m.content || '';
             let chinese: string | undefined;
+            
             // 尝试解析 metadata，提取英文和中文翻译
             try {
               if (m.metadata) {
@@ -174,12 +211,18 @@ export const useInterviewStore = defineStore('interview', {
                 if (meta && typeof meta === 'object') {
                   content = (meta.english as string) || (meta.chinese as string) || content;
                   chinese = meta.chinese as string;
+                  // 从 AI 消息的 metadata 中读取阶段信息作为备份
+                  if ((m.sender === 'assistant' || m.sender === 'ai') && meta.stage) {
+                    savedStage = meta.stage as string;
+                  }
                 }
               }
             } catch {
               // ignore
             }
+            
             const role = m.sender === 'user' ? 'user' : (m.sender === 'system' ? 'system' : 'ai');
+            
             this.messages.push({
               id: m.messageId || `${m.id}`,
               role,
@@ -189,6 +232,24 @@ export const useInterviewStore = defineStore('interview', {
               isSystem: role === 'system'
             });
           }
+          
+          // 如果会话数据中没有阶段信息，尝试从消息 metadata 中恢复
+          if (!sessionResp?.session?.currentStage && savedStage) {
+            this.currentStage = savedStage as InterviewStage;
+            console.log('[Store] 从消息 metadata 恢复阶段:', savedStage);
+          }
+          
+          // 如果会话数据中也没有轮次信息，根据消息数量估算
+          if (sessionResp?.session?.stageRound == null) {
+            const aiMsgCount = this.messages.filter(m => m.role === 'ai').length;
+            this.totalRounds = Math.max(0, aiMsgCount - 1);
+            // 简单估算当前阶段内的轮次
+            if (this.currentStage && this.isDynamicMode) {
+              const stageIndex = INTERVIEW_STAGES.findIndex(s => s.key === this.currentStage);
+              this.stageRound = Math.max(0, this.totalRounds - stageIndex * 3);
+            }
+          }
+          console.log('[Store] 恢复会话完成: stage=', this.currentStage, 'round=', this.stageRound, 'total=', this.totalRounds);
         }
       } catch (e) {
         console.warn('[Store] 恢复会话消息失败:', e);
@@ -259,6 +320,11 @@ export const useInterviewStore = defineStore('interview', {
         case 'STAGE_TRANSITION':
           this.handleStageTransition(message);
           break;
+        case 'SESSION_INIT':
+          this.sessionId = message.sessionId
+            || (message.metadata && typeof message.metadata === 'object' ? (message.metadata as any).dbSessionId : undefined)
+            || this.sessionId;
+          break;
         case 'PONG':
           console.log('[WS] 收到心跳响应');
           break;
@@ -320,15 +386,40 @@ export const useInterviewStore = defineStore('interview', {
       else if (message.sender === 'system') role = 'system';
       else role = 'ai';
 
+      // 从 metadata 中提取中文翻译和阶段信息
+      let content = message.content;
+      let chinese: string | undefined;
+      let msgStage: string | undefined;
+      
+      if (message.metadata && typeof message.metadata === 'object') {
+        const meta = message.metadata as Record<string, unknown>;
+        if (meta.chinese && typeof meta.chinese === 'string') {
+          chinese = meta.chinese;
+        }
+        if (meta.english && typeof meta.english === 'string') {
+          content = meta.english;
+        }
+        if (meta.stage && typeof meta.stage === 'string') {
+          msgStage = meta.stage;
+        }
+      }
+
       this.messages.push({
         id: message.id || uid(),
         role: role,
-        content: message.content,
-        createdAt: message.timestamp || Date.now()
+        content: content,
+        createdAt: message.timestamp || Date.now(),
+        chinese: role === 'ai' ? chinese : undefined,
+        stageInfo: msgStage ? { stage: msgStage as InterviewStage } : undefined
       });
 
       if (role === 'ai') {
         this.status = 'idle';
+        // 动态模式：根据 AI 消息中的阶段信息更新当前阶段
+        if (this.isDynamicMode && msgStage) {
+          this.currentStage = msgStage as InterviewStage;
+          console.log('[Store] 从AI消息更新阶段:', msgStage);
+        }
         // 动态模式：检查阶段切换
         if (this.isDynamicMode) {
           this.checkStageTransition();
@@ -411,15 +502,17 @@ export const useInterviewStore = defineStore('interview', {
           timestamp: Date.now()
         };
 
-        // 动态模式附加上下文到 sessionId（作为扩展字段传输）
+        // 动态模式附加上下文到 sessionId 和 metadata（双保险）
         if (this.isDynamicMode) {
-          payload.sessionId = JSON.stringify({
+          const stageInfo = {
             mode: 'dynamic',
             stage: this.currentStage,
             focus: this.focus,
             stageRound: this.stageRound,
             totalRounds: this.totalRounds
-          });
+          };
+          payload.sessionId = JSON.stringify(stageInfo);
+          payload.metadata = stageInfo;
         }
 
         wsClientAfterWait.send(payload);

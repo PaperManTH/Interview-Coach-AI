@@ -38,6 +38,10 @@ defineProps<{ message: ChatMessage }>();
         <p class="content">
           {{ message.content }}<span v-if="message.streaming" class="caret">▍</span>
         </p>
+        <!-- 中文翻译 -->
+        <p v-if="message.role === 'ai' && message.chinese" class="translation">
+          {{ message.chinese }}
+        </p>
       </div>
     </div>
 
@@ -183,6 +187,17 @@ defineProps<{ message: ChatMessage }>();
 
 .content {
   margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.translation {
+  margin: 8px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid rgba(148, 163, 184, 0.15);
+  font-size: 13px;
+  line-height: 1.6;
+  color: #64748b;
   white-space: pre-wrap;
   word-break: break-word;
 }

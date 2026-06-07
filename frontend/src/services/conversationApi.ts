@@ -198,6 +198,26 @@ export async function endSession(sessionId: string): Promise<{ success: boolean;
 }
 
 /**
+ * 暂停会话（用户退出但未完成面试）
+ */
+export async function pauseSession(sessionId: string): Promise<{ success: boolean; message: string }> {
+  const url = `${getApiBaseUrl()}/conversation/sessions/${sessionId}/pause`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+
+  if (!response.ok) {
+    throw new Error(`暂停会话失败: ${response.status} ${response.statusText}`);
+  }
+
+  return safeJsonParse(response, {
+    success: false,
+    message: '操作失败',
+  });
+}
+
+/**
  * 获取用户的会话数量统计
  */
 export async function getSessionCount(userId: string): Promise<{ success: boolean; count: number }> {

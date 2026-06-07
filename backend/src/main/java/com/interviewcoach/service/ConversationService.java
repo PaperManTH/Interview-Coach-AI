@@ -48,9 +48,16 @@ public class ConversationService {
         InterviewSession session = new InterviewSession();
         session.setSessionId(UUID.randomUUID().toString().replace("-", ""));
         session.setUserId(userId != null ? userId : "anonymous");
-        session.setStatus("active");
+        session.setStatus("ACTIVE");
         session.setInterviewType(interviewType != null ? interviewType : "general");
         session.setStartedAt(LocalDateTime.now());
+        
+        // 初始化动态面试进度
+        if ("dynamic".equalsIgnoreCase(interviewType)) {
+            session.setCurrentStage("warmup");
+            session.setStageRound(0);
+            session.setTotalRounds(0);
+        }
 
         int result = sessionMapper.insert(session);
         if (result > 0) {
@@ -65,10 +72,11 @@ public class ConversationService {
      * @return 活跃会话，如果没有则返回 null
      */
     public InterviewSession getActiveSession(String userId) {
+        // 兼容大小写：查询 ACTIVE 或 active 状态的会话
         return sessionMapper.selectOne(
                 new LambdaQueryWrapper<InterviewSession>()
                         .eq(InterviewSession::getUserId, userId)
-                        .eq(InterviewSession::getStatus, "active")
+                        .in(InterviewSession::getStatus, "ACTIVE", "active", "PAUSED", "paused")
                         .orderByDesc(InterviewSession::getStartedAt)
                         .last("LIMIT 1")
         );
@@ -118,7 +126,7 @@ public class ConversationService {
             return false;
         }
         session.setStatus(status);
-        if ("ended".equals(status)) {
+        if ("ENDED".equals(status)) {
             session.setEndedAt(LocalDateTime.now());
         }
         int result = sessionMapper.updateById(session);
@@ -130,7 +138,7 @@ public class ConversationService {
      */
     @Transactional(rollbackFor = Exception.class)
     public boolean endSession(String sessionId) {
-        return updateSessionStatus(sessionId, "ended");
+        return updateSessionStatus(sessionId, "ENDED");
     }
 
     /**
@@ -143,10 +151,38 @@ public class ConversationService {
             log.warn("[Conversation] 会话不存在: sessionId={}", sessionId);
             return false;
         }
+        session.setStatus("PAUSED");
         session.setPausedAt(LocalDateTime.now());
         int result = sessionMapper.updateById(session);
         if (result > 0) {
             log.info("[Conversation] 会话已暂停: sessionId={}", sessionId);
+        }
+        return result > 0;
+    }
+
+    /**
+     * 更新会话的阶段进度（每次用户发送消息后调用）
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public boolean updateStageProgress(String sessionId, String currentStage, Integer stageRound, Integer totalRounds) {
+        InterviewSession session = getSession(sessionId);
+        if (session == null) {
+            log.warn("[Conversation] 会话不存在: sessionId={}", sessionId);
+            return false;
+        }
+        if (currentStage != null) {
+            session.setCurrentStage(currentStage);
+        }
+        if (stageRound != null) {
+            session.setStageRound(stageRound);
+        }
+        if (totalRounds != null) {
+            session.setTotalRounds(totalRounds);
+        }
+        int result = sessionMapper.updateById(session);
+        if (result > 0) {
+            log.info("[Conversation] 阶段进度已更新: sessionId={}, stage={}, round={}, total={}", 
+                    sessionId, currentStage, stageRound, totalRounds);
         }
         return result > 0;
     }

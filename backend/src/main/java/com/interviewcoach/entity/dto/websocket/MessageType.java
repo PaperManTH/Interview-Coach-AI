@@ -41,5 +41,8 @@ public enum MessageType {
     VOICE_TEXT,
 
     /** 阶段切换通知（动态面试模式） */
-    STAGE_TRANSITION
+    STAGE_TRANSITION,
+
+    /** 会话初始化：服务端向客户端下发真实 dbSessionId */
+    SESSION_INIT
 }

@@ -76,6 +76,14 @@ public class ConversationController {
         
         IPage<InterviewSession> sessions = conversationService.listSessionsByUser(userId, page, size);
         
+        // 调试日志
+        if (sessions.getRecords() != null) {
+            for (InterviewSession s : sessions.getRecords()) {
+                log.info("[Controller] 会话列表: sessionId={}, status={}, currentStage={}, stageRound={}, totalRounds={}",
+                        s.getSessionId(), s.getStatus(), s.getCurrentStage(), s.getStageRound(), s.getTotalRounds());
+            }
+        }
+        
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
         response.put("data", sessions.getRecords());
@@ -113,6 +121,19 @@ public class ConversationController {
         Map<String, Object> response = new HashMap<>();
         response.put("success", success);
         response.put("message", success ? "会话已结束" : "会话不存在");
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 暂停会话（用户退出面试但未完成）
+     * POST /api/conversation/sessions/{sessionId}/pause
+     */
+    @PostMapping("/sessions/{sessionId}/pause")
+    public ResponseEntity<Map<String, Object>> pauseSession(@PathVariable String sessionId) {
+        boolean success = conversationService.pauseSession(sessionId);
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", success);
+        response.put("message", success ? "会话已暂停" : "会话不存在");
         return ResponseEntity.ok(response);
     }
 
