@@ -1,19 +1,20 @@
 package com.interviewcoach.websocket;
 
+import com.interviewcoach.entity.InterviewSession;
 import com.interviewcoach.entity.dto.ai.BilingualResponse;
 import com.interviewcoach.entity.dto.websocket.MessageDTO;
 import com.interviewcoach.entity.dto.websocket.MessageType;
 import com.interviewcoach.service.AsrService;
+import com.interviewcoach.service.ConversationService;
 import com.interviewcoach.service.SpringAiService;
 import com.interviewcoach.service.TtsService;
 import com.interviewcoach.utils.MessageCodec;
 
 import com.interviewcoach.entity.InterviewMessage;
-import com.interviewcoach.service.ConversationService;
+import lombok.extern.slf4j.Slf4j;
 
 import jakarta.websocket.*;
 import jakarta.websocket.server.ServerEndpoint;
-import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -61,7 +62,7 @@ public class InterviewWsEndpoint {
 
     @OnOpen
     public void onOpen(Session session, EndpointConfig config) {
-        String sessionId = session.getId();
+        String websocketSessionId = session.getId();
         
         if (sessionManager == null) {
             try {
@@ -74,15 +75,50 @@ public class InterviewWsEndpoint {
         session.getUserProperties().put(WebSocketSessionManager.KEY_USER_ID, userId);
         sessionManager.register(session);
         
-        log.info("[WS] 连接建立 sessionId={}, userId={}", sessionId, userId);
+        // 创建数据库会话记录（用于消息持久化）
+        String dbSessionId = null;
+        log.info("[WS] conversationService = {}", conversationService);
+        if (conversationService != null) {
+            try {
+                // 先检查用户是否已有活跃会话，如果有则复用
+                InterviewSession existingSession = conversationService.getActiveSession(userId);
+                if (existingSession != null) {
+                    dbSessionId = existingSession.getSessionId();
+                    log.info("[WS] 复用用户活跃会话: dbSessionId={}, userId={}", dbSessionId, userId);
+                } else {
+                    InterviewSession dbSession = conversationService.createSession(userId, "dynamic");
+                    dbSessionId = dbSession.getSessionId();
+                    log.info("[WS] 数据库会话创建成功: dbSessionId={}, userId={}", dbSessionId, userId);
+                }
+                session.getUserProperties().put("dbSessionId", dbSessionId);
+            } catch (Exception e) {
+                log.error("[WS] 数据库会话创建/复用失败", e);
+            }
+        } else {
+            log.warn("[WS] conversationService 为 null，无法创建数据库会话");
+        }
+        
+        log.info("[WS] 连接建立 websocketSessionId={}, userId={}, dbSessionId={}", websocketSessionId, userId, dbSessionId);
         sendWelcomeMessage(session, userId);
     }
 
     @OnClose
     public void onClose(Session session, CloseReason reason) {
+        String dbSessionId = (String) session.getUserProperties().get("dbSessionId");
+        
+        // 结束数据库会话
+        if (conversationService != null && dbSessionId != null) {
+            try {
+                conversationService.endSession(dbSessionId);
+                log.info("[WS] 数据库会话已结束: dbSessionId={}", dbSessionId);
+            } catch (Exception e) {
+                log.warn("[WS] 结束数据库会话失败: {}", e.getMessage());
+            }
+        }
+        
         if (sessionManager != null) {
             sessionManager.unregister(session);
-            log.info("[WS] 连接关闭 sessionId={}, reason={}", session.getId(), reason);
+            log.info("[WS] 连接关闭 websocketSessionId={}, reason={}", session.getId(), reason);
         }
     }
 
@@ -137,7 +173,25 @@ public class InterviewWsEndpoint {
         String userMessage = msg.getContent();
         String userId = getUserId(session);
         String websocketSessionId = session.getId();
-        log.info("[WS] 收到消息 sessionId={}, content={}", websocketSessionId, userMessage);
+        String dbSessionId = (String) session.getUserProperties().get("dbSessionId");
+        log.info("[WS] 收到消息 websocketSessionId={}, dbSessionId={}, userId={}, content={}", websocketSessionId, dbSessionId, userId, userMessage);
+
+        // 如果 dbSessionId 为空，动态创建数据库会话
+        if ((dbSessionId == null || dbSessionId.isEmpty()) && conversationService != null) {
+            try {
+                InterviewSession existingSession = conversationService.getActiveSession(userId);
+                if (existingSession != null) {
+                    dbSessionId = existingSession.getSessionId();
+                } else {
+                    InterviewSession dbSession = conversationService.createSession(userId, "dynamic");
+                    dbSessionId = dbSession.getSessionId();
+                }
+                session.getUserProperties().put("dbSessionId", dbSessionId);
+                log.info("[WS] 动态创建/复用会话: dbSessionId={}", dbSessionId);
+            } catch (Exception e) {
+                log.warn("[WS] 动态创建会话失败: {}", e.getMessage());
+            }
+        }
 
         // 1. 先将用户消息回传给前端（让用户看到自己发送的消息）
         MessageDTO userMsg = MessageDTO.builder()
@@ -150,8 +204,9 @@ public class InterviewWsEndpoint {
                 .build();
         sendMessage(session, userMsg);
 
-        // 1.5 持久化用户消息
-        saveMessageToDatabase(websocketSessionId, userId, userMsg.getId(), "user", "text", userMessage);
+        // 1.5 持久化用户消息（使用数据库会话ID）
+        log.info("[WS-Persistence] 保存用户消息: messageId={}, dbSessionId={}", userMsg.getId(), dbSessionId);
+        saveMessageToDatabase(dbSessionId, userId, userMsg.getId(), "user", "text", userMessage);
 
         // 2. 生成 AI 双语回复（传递原始 msg 以提取动态模式 metadata）
         BilingualResponse aiResponse = callAiServiceBilingual(userId, userMessage, msg);
@@ -174,14 +229,15 @@ public class InterviewWsEndpoint {
         sendMessage(session, reply);
         sendMessage(session, MessageDTO.ack(msg.getId()));
 
-        // 3.5 持久化 AI 回复消息
+        // 3.5 持久化 AI 回复消息（使用数据库会话ID）
         String metadataJson = null;
         try {
             metadataJson = MessageCodec.toJson(bilingualContent);
         } catch (Exception e) {
             log.warn("[WS-Persistence] metadata 序列化失败: {}", e.getMessage());
         }
-        saveMessageToDatabase(websocketSessionId, userId, reply.getId(), "assistant", "text", aiResponse.getFormattedText(), metadataJson);
+        log.info("[WS-Persistence] 保存 AI 回复: messageId={}, dbSessionId={}", reply.getId(), dbSessionId);
+        saveMessageToDatabase(dbSessionId, userId, reply.getId(), "assistant", "text", aiResponse.getFormattedText(), metadataJson);
 
         // 4. TTS 语音合成（仅处理英文部分，过滤疑似降级/错误提示）
         String englishText = aiResponse.getEnglish();
@@ -206,7 +262,11 @@ public class InterviewWsEndpoint {
     private void saveMessageToDatabase(String sessionId, String userId, String messageId,
                                         String sender, String type, String content, String metadata) {
         if (conversationService == null) {
-            log.debug("[WS-Persistence] ConversationService 未初始化，跳过消息持久化");
+            log.warn("[WS-Persistence] ConversationService 未初始化，跳过消息持久化");
+            return;
+        }
+        if (sessionId == null || sessionId.isEmpty()) {
+            log.warn("[WS-Persistence] sessionId 为空，跳过消息持久化 (sender={}, content={})", sender, content);
             return;
         }
         try {
@@ -219,9 +279,9 @@ public class InterviewWsEndpoint {
             message.setTimestampMs(System.currentTimeMillis());
             message.setMetadata(metadata);
             conversationService.saveMessage(message);
-            log.debug("[WS-Persistence] 消息持久化成功: messageId={}, sender={}", messageId, sender);
+            log.info("[WS-Persistence] 消息持久化成功: messageId={}, sender={}, sessionId={}", messageId, sender, sessionId);
         } catch (Exception e) {
-            log.error("[WS-Persistence] 消息持久化失败: {}", e.getMessage());
+            log.error("[WS-Persistence] 消息持久化失败: {}", e.getMessage(), e);
         }
     }
 
@@ -313,6 +373,25 @@ public class InterviewWsEndpoint {
                 .sessionId(session.getId())
                 .build();
         sendMessage(session, voiceTextMsg);
+
+        // ===== 语音识别失败时直接降级处理，不继续调用 LLM 和 TTS =====
+        if (voiceText == null || voiceText.isEmpty() || 
+            voiceText.contains("失败") || voiceText.contains("未就绪") || 
+            voiceText.contains("error") || voiceText.contains("Error") ||
+            voiceText.contains("识别失败") || voiceText.contains("暂无结果")) {
+            log.warn("[WS] 语音识别失败，跳过 LLM 和 TTS 流程: {}", voiceText);
+            // 发送错误提示消息
+            MessageDTO errorMsg = MessageDTO.builder()
+                    .id(UUID.randomUUID().toString())
+                    .type(MessageType.TEXT)
+                    .sender("system")
+                    .content("抱歉，语音识别失败，请重试或使用文字输入")
+                    .timestamp(System.currentTimeMillis())
+                    .sessionId(session.getId())
+                    .build();
+            sendMessage(session, errorMsg);
+            return; // 直接返回，不继续后续流程
+        }
 
         // 2. 生成 AI 双语回复（传递原始 msg 以提取动态模式 metadata）
         BilingualResponse aiResponse = callAiServiceBilingual(userId, voiceText, msg);

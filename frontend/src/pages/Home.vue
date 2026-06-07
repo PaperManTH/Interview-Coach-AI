@@ -14,6 +14,7 @@ import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/authStore';
 import ResumeUpload from '@/components/resume/ResumeUpload.vue';
+import UserDropdown from '@/components/UserDropdown.vue';
 import type { ResumeResponse } from '@/types/resume';
 import type { InterviewFocus } from '@/types/scene';
 import { INTERVIEW_FOCUS_OPTIONS } from '@/types/scene';
@@ -81,21 +82,7 @@ function startInterview() {
             <img :src="settingPng" class="nav-icon" alt="settings" />
             <span class="nav-label">Settings</span>
           </button>
-          <div v-if="auth.isLoggedIn" class="user-chip">
-            <div
-              class="avatar-clickable"
-              @click="router.push('/profile')"
-              title="个人主页"
-            >
-              <div class="avatar-glow">
-                <img v-if="auth.avatarUrl" :src="auth.avatarUrl" class="avatar" alt="" />
-                <div v-else class="avatar fallback">{{ (auth.username || 'U').charAt(0).toUpperCase() }}</div>
-              </div>
-              <span class="avatar-badge">👤</span>
-            </div>
-            <span class="username">{{ auth.username || 'User' }}</span>
-            <button class="logout-btn" @click="auth.logout()" title="登出">↩</button>
-          </div>
+          <UserDropdown v-if="auth.isLoggedIn" />
           <button v-else class="login-btn-icon" @click="router.push('/login')" title="登录">
             <img :src="loginIconPng" class="login-btn-icon-img" alt="登录" />
           </button>

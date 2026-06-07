@@ -257,8 +257,17 @@ public class IflytekAsrProvider {
             }
 
             // status=2 是最终稳定结果，覆盖之前的临时结果
-            if (status == 2 || finalText.length() == 0) {
-                finalText.setLength(0);
+            // 但如果最后一包是空的，保留之前的累积结果
+            if (status == 2) {
+                if (segment.length() > 0) {
+                    finalText.setLength(0);
+                    finalText.append(segment);
+                }
+            } else if (finalText.length() == 0 && segment.length() > 0) {
+                // 第一帧有结果时初始化
+                finalText.append(segment);
+            } else if (segment.length() > 0) {
+                // 中间帧追加结果
                 finalText.append(segment);
             }
         } catch (Exception e) {

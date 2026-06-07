@@ -110,7 +110,7 @@ export const useInterviewStore = defineStore('interview', {
           createdAt: Date.now()
         });
       }
-      this.connectWebSocket();
+      // 延迟连接 WebSocket，直到用户发送第一条消息
     },
 
     /** 启动动态模式会话 */
@@ -319,9 +319,15 @@ export const useInterviewStore = defineStore('interview', {
         this.totalRounds++;
       }
 
-      await waitForWs(this, 5000);
+      // 如果 WebSocket 未连接，则先连接
       const wsClient = getWebSocketClient();
-      if (wsClient && wsClient.isConnectedState()) {
+      if (!wsClient || !wsClient.isConnectedState()) {
+        this.connectWebSocket();
+      }
+
+      await waitForWs(this, 5000);
+      const wsClientAfterWait = getWebSocketClient();
+      if (wsClientAfterWait && wsClientAfterWait.isConnectedState()) {
         // 构建消息体，包含阶段信息
         const payload: WebSocketMessage = {
           id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -343,7 +349,7 @@ export const useInterviewStore = defineStore('interview', {
           });
         }
 
-        wsClient.send(payload);
+        wsClientAfterWait.send(payload);
         console.log('[Chat] 已发送文本到后端, stage=', this.currentStage, 'round=', this.stageRound);
       } else {
         // Mock 降级

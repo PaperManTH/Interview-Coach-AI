@@ -60,6 +60,21 @@ public class ConversationService {
     }
 
     /**
+     * 获取用户的活跃会话（状态为 active 的会话）
+     * @param userId 用户ID
+     * @return 活跃会话，如果没有则返回 null
+     */
+    public InterviewSession getActiveSession(String userId) {
+        return sessionMapper.selectOne(
+                new LambdaQueryWrapper<InterviewSession>()
+                        .eq(InterviewSession::getUserId, userId)
+                        .eq(InterviewSession::getStatus, "active")
+                        .orderByDesc(InterviewSession::getStartedAt)
+                        .last("LIMIT 1")
+        );
+    }
+
+    /**
      * 根据会话ID获取会话
      */
     public InterviewSession getSession(String sessionId) {
@@ -182,9 +197,21 @@ public class ConversationService {
             message.setTimestampMs(System.currentTimeMillis());
         }
 
-        int result = messageMapper.insert(message);
-        if (result > 0) {
-            log.debug("[Conversation] 消息保存成功: messageId={}, sessionId={}", message.getMessageId(), message.getSessionId());
+        log.info("[Conversation] 正在保存消息: sessionId={}, messageId={}, sender={}, contentLength={}",
+                message.getSessionId(), message.getMessageId(), message.getSender(),
+                message.getContent() != null ? message.getContent().length() : 0);
+
+        try {
+            int result = messageMapper.insert(message);
+            if (result > 0) {
+                log.info("[Conversation] ✅ 消息保存成功: id={}, messageId={}, sessionId={}",
+                        message.getId(), message.getMessageId(), message.getSessionId());
+            } else {
+                log.warn("[Conversation] ❌ 消息保存失败: messageMapper.insert 返回 0, messageId={}", message.getMessageId());
+            }
+        } catch (Exception e) {
+            log.error("[Conversation] ❌ 消息保存异常: messageId={}, sessionId={}", message.getMessageId(), message.getSessionId(), e);
+            throw e;
         }
         return message;
     }

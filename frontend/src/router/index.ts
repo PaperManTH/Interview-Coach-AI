@@ -46,6 +46,12 @@ const routes: RouteRecordRaw[] = [
     meta: { title: 'Profile', requiresAuth: true },
   },
   {
+    path: '/history',
+    name: 'History',
+    component: () => import('@/pages/History.vue'),
+    meta: { title: 'Interview History', requiresAuth: true },
+  },
+  {
     path: '/:pathMatch(.*)*',
     redirect: '/',
   },
