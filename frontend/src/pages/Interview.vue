@@ -17,13 +17,18 @@ const store = useInterviewStore();
 const isDynamicMode = computed(() => route.name === 'DynamicInterview');
 const busy = computed(() => store.status !== 'idle');
 
-onMounted(() => {
+onMounted(async () => {
+  // 支持通过 ?resumeSessionId=xxx 恢复之前的会话
+  const resumeSessionId = route.query.resumeSessionId as string;
+  if (resumeSessionId) {
+    await store.resumeSession(resumeSessionId);
+    return;
+  }
+
   if (isDynamicMode.value) {
-    // 动态模式：从 query 读取 focus 参数
     const focus = (route.query.focus as InterviewFocus) || 'general';
     store.startDynamicSession(focus);
   } else {
-    // 传统模式：从 params 读取 scene
     const scene = String(route.params.scene ?? '');
     if (!isValidSceneKey(scene)) {
       router.replace('/');

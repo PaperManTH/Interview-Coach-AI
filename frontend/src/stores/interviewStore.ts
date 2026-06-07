@@ -7,6 +7,11 @@ import { getAudioRecorder, destroyAudioRecorder } from '@/utils/audioRecorder';
 import { getSpeechSynthesizer, destroySpeechSynthesizer, type SpeechCallbacks } from '@/utils/speechSynthesis';
 import { convertToPcm, pcmToBase64 } from '@/utils/audioConverter';
 import { useAuthStore } from '@/stores/authStore';
+import {
+  getSessionDetail,
+  getSessionMessages,
+  type InterviewMessage,
+} from '@/services/conversationApi';
 
 // ===== 阶段配置 =====
 const STAGE_OPENINGS: Record<InterviewStage, string> = {
@@ -131,6 +136,74 @@ export const useInterviewStore = defineStore('interview', {
         createdAt: Date.now(),
         stageInfo: { stage: 'warmup', label: 'Warm-up', labelZh: '热身环节' }
       });
+      this.connectWebSocket();
+    },
+
+    /** 恢复一个已有的会话（在"继续"按钮被点击时调用） */
+    async resumeSession(sessionId: string) {
+      this._initCore();
+      this.isDynamicMode = true;
+      this.focus = 'general';
+      this.currentStage = 'warmup';
+      this.stageRound = 0;
+      this.totalRounds = 0;
+      this.completedStages = [];
+      // 注意：sessionId 必须在 _initCore 之后赋值，因为 _initCore 会重置它
+      this.sessionId = sessionId;
+
+      try {
+        const [sessionResp, msgResp] = await Promise.all([
+          getSessionDetail(sessionId),
+          getSessionMessages(sessionId)
+        ]);
+        if (sessionResp?.session) {
+          const type = String(sessionResp.session.interviewType || 'dynamic');
+          if (type !== 'dynamic') {
+            this.isDynamicMode = false;
+            this.scene = type;
+          }
+        }
+        if (msgResp?.success && Array.isArray(msgResp.data)) {
+          for (const m of msgResp.data as InterviewMessage[]) {
+            let content = m.content || '';
+            let chinese: string | undefined;
+            // 尝试解析 metadata，提取英文和中文翻译
+            try {
+              if (m.metadata) {
+                const meta = JSON.parse(String(m.metadata));
+                if (meta && typeof meta === 'object') {
+                  content = (meta.english as string) || (meta.chinese as string) || content;
+                  chinese = meta.chinese as string;
+                }
+              }
+            } catch {
+              // ignore
+            }
+            const role = m.sender === 'user' ? 'user' : (m.sender === 'system' ? 'system' : 'ai');
+            this.messages.push({
+              id: m.messageId || `${m.id}`,
+              role,
+              content,
+              createdAt: new Date(m.timestampMs || Date.now()).getTime(),
+              chinese: role === 'ai' ? chinese : undefined,
+              isSystem: role === 'system'
+            });
+          }
+        }
+      } catch (e) {
+        console.warn('[Store] 恢复会话消息失败:', e);
+      }
+
+      // 如果拉取不到历史消息，则至少显示一条开场白
+      if (this.messages.length === 0) {
+        this.messages.push({
+          id: uid(),
+          role: 'ai',
+          content: STAGE_OPENINGS['warmup'],
+          createdAt: Date.now(),
+          stageInfo: { stage: 'warmup', label: 'Warm-up', labelZh: '热身环节' }
+        });
+      }
       this.connectWebSocket();
     },
 
@@ -403,7 +476,7 @@ export const useInterviewStore = defineStore('interview', {
           const meta = getStageMeta(nextStage);
           this.messages.push({
             id: uid(),
-            role: 'ai',
+            role: 'system',
             content: `--- ${meta?.labelZh ?? nextStage} ---`,
             createdAt: Date.now(),
             isSystem: true

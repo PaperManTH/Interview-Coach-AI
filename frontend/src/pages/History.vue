@@ -72,13 +72,31 @@ const formatDate = (dateStr: string | null) => {
 };
 
 const formatDuration = (session: InterviewSession) => {
-  if (!session.endedAt) return '进行中';
+  if (session.endedAt) {
+    // 已结束的会话：使用开始和结束时间
+    const start = new Date(session.startedAt).getTime();
+    const end = new Date(session.endedAt).getTime();
+    const diff = Math.floor((end - start) / 1000);
+    const minutes = Math.floor(diff / 60);
+    const seconds = diff % 60;
+    return `共 ${minutes}分${seconds}秒`;
+  }
+  
+  // 未结束但已暂停的会话：使用暂停时间作为结束时间
   const start = new Date(session.startedAt).getTime();
-  const end = new Date(session.endedAt).getTime();
+  const end = session.pausedAt 
+    ? new Date(session.pausedAt).getTime()
+    : Date.now();
   const diff = Math.floor((end - start) / 1000);
+  if (diff < 0) return '-';
   const minutes = Math.floor(diff / 60);
   const seconds = diff % 60;
-  return `${minutes}分${seconds}秒`;
+  
+  if (session.pausedAt) {
+    return `暂停于 ${minutes}分${seconds}秒`;
+  } else {
+    return `已进行 ${minutes}分${seconds}秒`;
+  }
 };
 
 // ===== 方法 =====
@@ -88,8 +106,9 @@ async function loadSessions() {
   try {
     const response = await getSessionList(auth.userId || 'anonymous', currentPage.value, pageSize.value);
     if (response.success) {
-      sessions.value = response.data;
-      totalSessions.value = response.total;
+      sessions.value = response.data || [];
+      const total = Number(response.total);
+      totalSessions.value = Number.isFinite(total) && total > 0 ? total : sessions.value.length;
     } else {
       errorMsg.value = '加载失败';
     }
@@ -156,6 +175,14 @@ function goBack() {
 
 function startNewInterview() {
   router.push('/');
+}
+
+function resumeSession(session: InterviewSession) {
+  // 根据面试类型跳转到对应的面试页，并携带 sessionId 以便继续
+  const target = session.interviewType === 'dynamic'
+    ? { name: 'DynamicInterview', query: { resumeSessionId: session.sessionId, focus: 'general' } }
+    : { path: '/interview/dynamic', query: { resumeSessionId: session.sessionId } };
+  router.push(target);
 }
 
 // 解析 metadata 获取双语内容
@@ -243,6 +270,14 @@ onMounted(() => {
                     {{ statusLabel(session.status).text }}
                   </span>
                   <span class="session-duration">{{ formatDuration(session) }}</span>
+                  <button
+                    v-if="session.status === 'active'"
+                    class="resume-btn"
+                    @click.stop="resumeSession(session)"
+                    title="继续此面试"
+                  >
+                    继续
+                  </button>
                 </div>
                 <button
                   class="delete-btn"
@@ -540,6 +575,22 @@ onMounted(() => {
 .status-active { background: rgba(16, 185, 129, 0.15); color: #059669; }
 .status-ended { background: rgba(148, 163, 184, 0.15); color: #64748b; }
 .session-duration { font-size: 12px; color: #94a3b8; }
+.resume-btn {
+  margin-top: 4px;
+  padding: 4px 10px;
+  background: rgba(30, 64, 175, 0.08);
+  border: 1px solid rgba(30, 64, 175, 0.3);
+  border-radius: 999px;
+  color: #1e40af;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 150ms;
+}
+.resume-btn:hover {
+  background: rgba(30, 64, 175, 0.15);
+  transform: translateY(-1px);
+}
 .delete-btn {
   padding: 6px;
   background: transparent;

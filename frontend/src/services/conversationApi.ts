@@ -32,6 +32,7 @@ export interface InterviewSession {
   interviewType: string;
   startedAt: string;
   endedAt: string | null;
+  pausedAt: string | null; // 暂停时间（用户退出但未结束面试时记录）
   createdAt: string;
   updatedAt: string;
 }

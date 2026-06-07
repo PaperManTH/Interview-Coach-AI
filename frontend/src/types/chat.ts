@@ -17,6 +17,7 @@ export interface ChatMessage {
     label: string;
     labelZh: string;
   };
+  chinese?: string;    // 中文翻译（AI 消息）
 }
 
 // 会话状态：idle / listening（录音中）/ thinking（生成中）/ speaking（TTS 播放中）/ processing（处理中）

@@ -22,6 +22,7 @@ public class InterviewSession {
     private String interviewType;
     private LocalDateTime startedAt;
     private LocalDateTime endedAt;
+    private LocalDateTime pausedAt; // 暂停时间（用户退出但未结束面试时记录）
 
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;

@@ -134,6 +134,24 @@ public class ConversationService {
     }
 
     /**
+     * 暂停会话（用户退出但未结束面试）
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public boolean pauseSession(String sessionId) {
+        InterviewSession session = getSession(sessionId);
+        if (session == null) {
+            log.warn("[Conversation] 会话不存在: sessionId={}", sessionId);
+            return false;
+        }
+        session.setPausedAt(LocalDateTime.now());
+        int result = sessionMapper.updateById(session);
+        if (result > 0) {
+            log.info("[Conversation] 会话已暂停: sessionId={}", sessionId);
+        }
+        return result > 0;
+    }
+
+    /**
      * 删除会话（级联删除消息）
      */
     @Transactional(rollbackFor = Exception.class)

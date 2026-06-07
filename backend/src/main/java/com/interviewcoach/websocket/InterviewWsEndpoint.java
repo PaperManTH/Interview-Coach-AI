@@ -106,13 +106,13 @@ public class InterviewWsEndpoint {
     public void onClose(Session session, CloseReason reason) {
         String dbSessionId = (String) session.getUserProperties().get("dbSessionId");
         
-        // 结束数据库会话
+        // 用户退出页面时暂停会话（而非结束），以便可以继续面试
         if (conversationService != null && dbSessionId != null) {
             try {
-                conversationService.endSession(dbSessionId);
-                log.info("[WS] 数据库会话已结束: dbSessionId={}", dbSessionId);
+                conversationService.pauseSession(dbSessionId);
+                log.info("[WS] 会话已暂停: dbSessionId={}", dbSessionId);
             } catch (Exception e) {
-                log.warn("[WS] 结束数据库会话失败: {}", e.getMessage());
+                log.warn("[WS] 暂停会话失败: {}", e.getMessage());
             }
         }
         
