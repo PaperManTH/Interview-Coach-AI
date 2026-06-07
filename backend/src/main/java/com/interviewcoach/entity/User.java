@@ -23,8 +23,11 @@ public class User {
     private String githubId;
 
     private String username;
+
     private String avatarUrl;
+
     private String email;
+
     private String token;
 
     @TableField(fill = FieldFill.INSERT)

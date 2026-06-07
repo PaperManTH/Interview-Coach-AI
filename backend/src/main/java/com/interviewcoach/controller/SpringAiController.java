@@ -21,6 +21,11 @@ public class SpringAiController {
 
     private final SpringAiService springAiService;
 
+    /**
+     * 普通聊天。
+     * @param request  请求体，包含 message 字段
+     * @return  AI 回复
+     */
     @PostMapping("/chat")
     public ResponseEntity<ApiResponse<String>> chat(@RequestBody Map<String, String> request) {
         String message = request.get("message");
@@ -32,6 +37,11 @@ public class SpringAiController {
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
+    /**
+     * 使用模板聊天。
+     * @param request  请求体，包含 template 和 params 字段
+     * @return  AI 回复
+     */
     @PostMapping("/chat/template")
     public ResponseEntity<ApiResponse<String>> chatWithTemplate(@RequestBody Map<String, Object> request) {
         String template = (String) request.get("template");
@@ -45,6 +55,11 @@ public class SpringAiController {
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
+    /**
+     * 带自定义 system prompt 的聊天。
+     * @param request  请求体，包含 system 和 message 字段
+     * @return  AI 回复
+     */
     @PostMapping("/chat/system")
     public ResponseEntity<ApiResponse<String>> chatWithSystem(@RequestBody Map<String, String> request) {
         String system = request.get("system");

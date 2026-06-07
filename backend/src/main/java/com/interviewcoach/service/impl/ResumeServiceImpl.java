@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.interviewcoach.common.Constants;
 import com.interviewcoach.entity.ResumeProfile;
 import com.interviewcoach.entity.dto.resume.ResumeParsedData;
 import com.interviewcoach.entity.dto.resume.ResumeResponse;
@@ -37,10 +38,6 @@ public class ResumeServiceImpl implements ResumeService {
     private final SpringAiService aiService;
 
     private final ObjectMapper objectMapper;
-
-    private static final long MAX_SIZE = 10 * 1024 * 1024; // 10 MB
-    
-    private static final String ALLOWED_EXT = ".pdf,.docx,.txt,.md,.rtf";
 
     private static final String RESUME_ANALYZER_PROMPT =
             """
@@ -205,7 +202,7 @@ public class ResumeServiceImpl implements ResumeService {
         if (file.isEmpty()) {
             throw new FileUploadException(400, "EMPTY_FILE", "上传文件为空");
         }
-        if (file.getSize() > MAX_SIZE) {
+        if (file.getSize() > Constants.MAX_FILE_SIZE_BYTES) {
             throw new FileUploadException(413, "FILE_TOO_LARGE",
                     String.format("文件过大（%.1f MB），最大允许 10 MB", file.getSize() / 1024.0 / 1024.0));
         }
@@ -215,7 +212,7 @@ public class ResumeServiceImpl implements ResumeService {
         }
         String lower = name.toLowerCase();
         boolean allowed = false;
-        for (String ext : ALLOWED_EXT.split(",")) {
+        for (String ext : Constants.ALLOWED_FILE_EXTENSIONS.split(",")) {
             if (lower.endsWith(ext.trim())) { allowed = true; break; }
         }
         if (!allowed) {

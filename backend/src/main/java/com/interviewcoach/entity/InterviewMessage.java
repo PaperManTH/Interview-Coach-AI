@@ -19,22 +19,22 @@ public class InterviewMessage {
 
     @JsonProperty("sessionId")
     private String sessionId;
-    
+
     @JsonProperty("messageId")
     private String messageId;
-    
+
     @JsonProperty("sender")
     private String sender;
-    
+
     @JsonProperty("type")
     private String type;
-    
+
     @JsonProperty("content")
     private String content;
-    
+
     @JsonProperty("timestampMs")
     private Long timestampMs;
-    
+
     @JsonProperty("metadata")
     private String metadata;
 

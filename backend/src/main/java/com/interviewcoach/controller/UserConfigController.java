@@ -23,12 +23,23 @@ public class UserConfigController {
 
     private final UserConfigService userConfigService;
 
+    /**
+     * 获取用户配置。
+     * @param userId  用户 ID
+     * @return  用户配置信息
+     */
     @GetMapping
     public ResponseEntity<ApiResponse<UserConfigResponse>> getConfig(@RequestParam String userId) {
         UserProviderConfig config = userConfigService.getConfig(userId);
         return ResponseEntity.ok(ApiResponse.ok(UserConfigResponse.fromEntity(config)));
     }
 
+    /**
+     * 保存用户配置。
+     * @param userId   用户 ID
+     * @param request  配置请求体
+     * @return  保存后的配置信息
+     */
     @PostMapping
     public ResponseEntity<ApiResponse<UserConfigResponse>> saveConfig(
             @RequestParam String userId,
@@ -54,12 +65,22 @@ public class UserConfigController {
         return ResponseEntity.ok(ApiResponse.ok(UserConfigResponse.fromEntity(saved)));
     }
 
+    /**
+     * 删除用户配置。
+     * @param userId  用户 ID
+     * @return  删除结果
+     */
     @DeleteMapping
     public ResponseEntity<ApiResponse<Void>> deleteConfig(@RequestParam String userId) {
         userConfigService.deleteConfig(userId);
         return ResponseEntity.ok(ApiResponse.ok());
     }
 
+    /**
+     * 检查用户是否有配置。
+     * @param userId  用户 ID
+     * @return  是否存在配置
+     */
     @GetMapping("/exists")
     public ResponseEntity<ApiResponse<Boolean>> hasConfig(@RequestParam String userId) {
         return ResponseEntity.ok(ApiResponse.ok(userConfigService.hasConfig(userId)));

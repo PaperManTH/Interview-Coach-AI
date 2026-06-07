@@ -34,6 +34,8 @@ const totalSessions = ref(0);
 const pageSize = ref(10);
 const errorMsg = ref('');
 const deleting = ref(false);
+const deleteTargetId = ref<string | null>(null);
+const showDeleteConfirm = ref(false);
 
 // ===== 计算属性 =====
 const hasMorePages = computed(() => {
@@ -153,7 +155,14 @@ function closeDetail() {
 }
 
 async function handleDelete(sessionId: string) {
-  if (!confirm('确定要删除这个面试记录吗？此操作不可恢复。')) return;
+  deleteTargetId.value = sessionId;
+  showDeleteConfirm.value = true;
+}
+
+async function confirmDelete() {
+  const sessionId = deleteTargetId.value;
+  if (!sessionId) return;
+  showDeleteConfirm.value = false;
   
   deleting.value = true;
   try {
@@ -171,7 +180,13 @@ async function handleDelete(sessionId: string) {
     errorMsg.value = e instanceof Error ? e.message : '删除失败';
   } finally {
     deleting.value = false;
+    deleteTargetId.value = null;
   }
+}
+
+function cancelDelete() {
+  showDeleteConfirm.value = false;
+  deleteTargetId.value = null;
 }
 
 function loadNextPage() {
@@ -207,14 +222,8 @@ function parseMetadata(metadata: string | null): { chinese?: string; english?: s
   }
 }
 
-let refreshTimer: number | null = null;
-
 onMounted(() => {
   loadSessions();
-  // 每5秒刷新一次会话列表，以便及时更新状态变化
-  refreshTimer = window.setInterval(() => {
-    loadSessions();
-  }, 5000);
 });
 
 // 页面激活时刷新会话列表（从面试页返回时会触发）
@@ -223,10 +232,6 @@ onActivated(() => {
 });
 
 onUnmounted(() => {
-  if (refreshTimer) {
-    clearInterval(refreshTimer);
-    refreshTimer = null;
-  }
 });
 </script>
 
@@ -397,6 +402,32 @@ onUnmounted(() => {
       <Transition name="fade">
         <div v-if="errorMsg" class="toast error">{{ errorMsg }}</div>
       </Transition>
+
+      <!-- Delete Confirm Modal -->
+      <Teleport to="body">
+        <Transition name="modal">
+          <div v-if="showDeleteConfirm" class="confirm-overlay" @click.self="cancelDelete">
+            <div class="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+              <div class="confirm-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="12" y1="8" x2="12" y2="12"/>
+                  <line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+              </div>
+              <h3 id="confirm-title">确认删除</h3>
+              <p class="confirm-desc">确定要删除这个面试记录吗？此操作不可恢复。</p>
+              <div class="confirm-actions">
+                <button class="confirm-btn cancel" @click="cancelDelete" :disabled="deleting">取消</button>
+                <button class="confirm-btn danger" @click="confirmDelete" :disabled="deleting">
+                  <span v-if="deleting" class="btn-spinner"></span>
+                  <span v-else>删除</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </Transition>
+      </Teleport>
     </div>
   </div>
 </template>
@@ -804,6 +835,130 @@ onUnmounted(() => {
 .fade-leave-active { transition: all 200ms ease-in; }
 .fade-enter-from { opacity: 0; transform: translateY(8px); }
 .fade-leave-to { opacity: 0; }
+
+/* ============ Delete Confirm Modal ============ */
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.confirm-dialog {
+  width: min(380px, 90vw);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 20px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.25);
+  padding: 32px 28px 24px;
+  text-align: center;
+}
+
+.confirm-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+  color: #dc2626;
+}
+
+.confirm-dialog h3 {
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.confirm-desc {
+  margin: 0 0 24px;
+  font-size: 14px;
+  color: #64748b;
+  line-height: 1.6;
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.confirm-btn {
+  padding: 10px 28px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 150ms;
+  border: none;
+  min-width: 90px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.confirm-btn.cancel {
+  background: rgba(241, 245, 249, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  color: #475569;
+}
+.confirm-btn.cancel:hover:not(:disabled) {
+  background: rgba(226, 232, 240, 0.9);
+}
+
+.confirm-btn.danger {
+  background: #dc2626;
+  color: #fff;
+  box-shadow: 0 2px 10px rgba(220, 38, 38, 0.3);
+}
+.confirm-btn.danger:hover:not(:disabled) {
+  background: #b91c1c;
+  box-shadow: 0 4px 16px rgba(220, 38, 38, 0.4);
+  transform: translateY(-1px);
+}
+
+.confirm-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+/* Modal transitions */
+.modal-enter-active { transition: opacity 200ms ease; }
+.modal-leave-active { transition: opacity 150ms ease; }
+.modal-enter-from { opacity: 0; }
+.modal-leave-to { opacity: 0; }
+.modal-enter-active .confirm-dialog { animation: scale-in 250ms cubic-bezier(0.16, 1, 0.3, 1); }
+.modal-leave-active .confirm-dialog { animation: scale-out 150ms ease forwards; }
+
+@keyframes scale-in {
+  from { transform: scale(0.92) translateY(10px); opacity: 0; }
+  to   { transform: scale(1) translateY(0); opacity: 1; }
+}
+@keyframes scale-out {
+  from { transform: scale(1) translateY(0); opacity: 1; }
+  to   { transform: scale(0.92) translateY(10px); opacity: 0; }
+}
 
 /* ============ Responsive ============ */
 @media (max-width: 768px) {

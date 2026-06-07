@@ -34,7 +34,7 @@ public class IflytekAsrProvider {
     private final String apiSecret;
 
     /**
-     * @param combinedKey 格式: "appid:apikey:apisecret"，如 "dc4634b7:236f94aeb93bf2be36af835f6c9d0935:ZTUxZmMwYWY3OTQ1ZDZjNWVhY2E2MmZh"
+     * @param combinedKey 格式: "appid:apikey:apisecret"
      */
     public IflytekAsrProvider(String combinedKey) {
         String[] parts = parseCombinedKey(combinedKey);

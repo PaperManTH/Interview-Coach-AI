@@ -1,6 +1,7 @@
 package com.interviewcoach.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.interviewcoach.common.Constants;
 import com.interviewcoach.entity.User;
 import com.interviewcoach.entity.UserProviderConfig;
 import com.interviewcoach.entity.dto.auth.LoginResponse;
@@ -233,9 +234,9 @@ public class AuthServiceImpl implements AuthService {
     private UserProviderConfig createDefaultConfig(String userId) {
         UserProviderConfig config = new UserProviderConfig();
         config.setUserId(userId);
-        config.setAsrType("mock");
-        config.setLlmType("mock");
-        config.setTtsType("mock");
+        config.setAsrType(Constants.PROVIDER_MOCK);
+        config.setLlmType(Constants.PROVIDER_MOCK);
+        config.setTtsType(Constants.PROVIDER_MOCK);
         return config;
     }
 

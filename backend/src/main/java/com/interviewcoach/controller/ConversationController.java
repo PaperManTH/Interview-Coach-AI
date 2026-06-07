@@ -15,8 +15,6 @@ import java.util.Map;
 
 /**
  * 对话记忆 REST API 控制器
- * 
- * 提供会话和消息的完整 CRUD 操作接口
  */
 @Slf4j
 @RestController
@@ -26,11 +24,11 @@ public class ConversationController {
     @Autowired
     private ConversationService conversationService;
 
-    // ==================== 会话管理 ====================
-
     /**
-     * 创建新会话
-     * POST /api/conversation/sessions
+     * 创建会话。
+     * @param userId        用户 ID
+     * @param interviewType 面试类型
+     * @return  创建的会话信息
      */
     @PostMapping("/sessions")
     public ResponseEntity<Map<String, Object>> createSession(
@@ -46,8 +44,9 @@ public class ConversationController {
     }
 
     /**
-     * 获取会话详情
-     * GET /api/conversation/sessions/{sessionId}
+     * 获取会话详情。
+     * @param sessionId  会话 ID
+     * @return  会话信息
      */
     @GetMapping("/sessions/{sessionId}")
     public ResponseEntity<Map<String, Object>> getSession(@PathVariable String sessionId) {
@@ -65,8 +64,11 @@ public class ConversationController {
     }
 
     /**
-     * 获取用户的会话列表（分页）
-     * GET /api/conversation/sessions/user/{userId}
+     * 获取用户的会话列表（分页）。
+     * @param userId  用户 ID
+     * @param page    页码
+     * @param size    每页大小
+     * @return  会话列表及分页信息
      */
     @GetMapping("/sessions/user/{userId}")
     public ResponseEntity<Map<String, Object>> listSessionsByUser(
@@ -94,8 +96,10 @@ public class ConversationController {
     }
 
     /**
-     * 更新会话状态
-     * PUT /api/conversation/sessions/{sessionId}/status
+     * 更新会话状态。
+     * @param sessionId  会话 ID
+     * @param status     新状态
+     * @return  更新结果
      */
     @PutMapping("/sessions/{sessionId}/status")
     public ResponseEntity<Map<String, Object>> updateSessionStatus(
@@ -111,8 +115,9 @@ public class ConversationController {
     }
 
     /**
-     * 结束会话
-     * POST /api/conversation/sessions/{sessionId}/end
+     * 结束会话。
+     * @param sessionId  会话 ID
+     * @return  结束结果
      */
     @PostMapping("/sessions/{sessionId}/end")
     public ResponseEntity<Map<String, Object>> endSession(@PathVariable String sessionId) {
@@ -125,8 +130,9 @@ public class ConversationController {
     }
 
     /**
-     * 暂停会话（用户退出面试但未完成）
-     * POST /api/conversation/sessions/{sessionId}/pause
+     * 暂停会话（用户退出面试但未完成）。
+     * @param sessionId  会话 ID
+     * @return  暂停结果
      */
     @PostMapping("/sessions/{sessionId}/pause")
     public ResponseEntity<Map<String, Object>> pauseSession(@PathVariable String sessionId) {
@@ -138,8 +144,9 @@ public class ConversationController {
     }
 
     /**
-     * 删除会话（级联删除消息）
-     * DELETE /api/conversation/sessions/{sessionId}
+     * 删除会话（级联删除消息）。
+     * @param sessionId  会话 ID
+     * @return  删除结果
      */
     @DeleteMapping("/sessions/{sessionId}")
     public ResponseEntity<Map<String, Object>> deleteSession(@PathVariable String sessionId) {
@@ -154,8 +161,9 @@ public class ConversationController {
     // ==================== 消息管理 ====================
 
     /**
-     * 保存消息
-     * POST /api/conversation/messages
+     * 保存消息。
+     * @param message  消息对象
+     * @return  保存后的消息
      */
     @PostMapping("/messages")
     public ResponseEntity<Map<String, Object>> saveMessage(@RequestBody InterviewMessage message) {
@@ -168,8 +176,9 @@ public class ConversationController {
     }
 
     /**
-     * 批量保存消息
-     * POST /api/conversation/messages/batch
+     * 批量保存消息。
+     * @param messages  消息列表
+     * @return  保存结果
      */
     @PostMapping("/messages/batch")
     public ResponseEntity<Map<String, Object>> saveMessages(@RequestBody List<InterviewMessage> messages) {
@@ -182,8 +191,9 @@ public class ConversationController {
     }
 
     /**
-     * 获取会话的所有消息
-     * GET /api/conversation/messages/session/{sessionId}
+     * 获取会话的所有消息。
+     * @param sessionId  会话 ID
+     * @return  消息列表
      */
     @GetMapping("/messages/session/{sessionId}")
     public ResponseEntity<Map<String, Object>> getMessagesBySessionId(@PathVariable String sessionId) {
@@ -197,8 +207,9 @@ public class ConversationController {
     }
 
     /**
-     * 获取单条消息
-     * GET /api/conversation/messages/{messageId}
+     * 获取单条消息。
+     * @param messageId  消息 ID
+     * @return  消息对象
      */
     @GetMapping("/messages/{messageId}")
     public ResponseEntity<Map<String, Object>> getMessage(@PathVariable String messageId) {
@@ -216,8 +227,10 @@ public class ConversationController {
     }
 
     /**
-     * 更新消息内容
-     * PUT /api/conversation/messages/{messageId}
+     * 更新消息内容。
+     * @param messageId  消息 ID
+     * @param body       请求体，包含 content 和 metadata 字段
+     * @return  更新结果
      */
     @PutMapping("/messages/{messageId}")
     public ResponseEntity<Map<String, Object>> updateMessage(
@@ -235,8 +248,9 @@ public class ConversationController {
     }
 
     /**
-     * 删除消息
-     * DELETE /api/conversation/messages/{messageId}
+     * 删除消息。
+     * @param messageId  消息 ID
+     * @return  删除结果
      */
     @DeleteMapping("/messages/{messageId}")
     public ResponseEntity<Map<String, Object>> deleteMessage(@PathVariable String messageId) {
@@ -251,8 +265,9 @@ public class ConversationController {
     // ==================== 统计查询 ====================
 
     /**
-     * 获取用户的会话数量
-     * GET /api/conversation/stats/user/{userId}/count
+     * 获取用户的会话数量。
+     * @param userId  用户 ID
+     * @return  会话数量
      */
     @GetMapping("/stats/user/{userId}/count")
     public ResponseEntity<Map<String, Object>> getSessionCountByUser(@PathVariable String userId) {
@@ -265,8 +280,9 @@ public class ConversationController {
     }
 
     /**
-     * 获取会话的消息数量
-     * GET /api/conversation/stats/session/{sessionId}/count
+     * 获取会话的消息数量。
+     * @param sessionId  会话 ID
+     * @return  消息数量
      */
     @GetMapping("/stats/session/{sessionId}/count")
     public ResponseEntity<Map<String, Object>> getMessageCountBySession(@PathVariable String sessionId) {
@@ -281,8 +297,9 @@ public class ConversationController {
     // ==================== 清理任务 ====================
 
     /**
-     * 手动触发过期会话清理
-     * DELETE /api/conversation/cleanup
+     * 手动触发过期会话清理。
+     * @param retentionDays  保留天数
+     * @return  清理结果
      */
     @DeleteMapping("/cleanup")
     public ResponseEntity<Map<String, Object>> cleanupExpiredSessions(

@@ -65,6 +65,7 @@ export const useInterviewStore = defineStore('interview', {
     audioTranscript: '',
     isCompleted: false,     // 面试是否已完成全部阶段
     isAwaitingSummary: false, // 等待 AI 生成面试总结
+    lastAudioBase64: null as string | null, // 最近一次 TTS 音频
   }),
 
   getters: {
@@ -92,7 +93,11 @@ export const useInterviewStore = defineStore('interview', {
       const base = (stageIndex / INTERVIEW_STAGES.length) * 100;
       const withinStage = (this.stageRound / ROUNDS_PER_STAGE) * (100 / INTERVIEW_STAGES.length);
       return Math.min(Math.round(base + withinStage), 99);
-    }
+    },
+    /** 是否有可重播的音频 */
+    hasAudio(): boolean {
+      return this.lastAudioBase64 !== null;
+    },
   },
 
   actions: {
@@ -446,11 +451,21 @@ export const useInterviewStore = defineStore('interview', {
 
     handleAudioMessage(message: WebSocketMessage) {
       if (!message.content) return;
+      this.lastAudioBase64 = message.content;
       const audio = new Audio('data:audio/wav;base64,' + message.content);
       audio.play().then(() => {
         console.log('[TTS] 音频播放完成');
       }).catch((e) => {
         console.error('[TTS] 音频播放失败:', e);
+      });
+    },
+
+    /** 重播最近一次 TTS 音频 */
+    replayAudio() {
+      if (!this.lastAudioBase64) return;
+      const audio = new Audio('data:audio/wav;base64,' + this.lastAudioBase64);
+      audio.play().catch((e) => {
+        console.error('[TTS] 重播失败:', e);
       });
     },
 
@@ -462,23 +477,23 @@ export const useInterviewStore = defineStore('interview', {
         if (nextStage && INTERVIEW_STAGES.find(s => s.key === nextStage)) {
           this.advanceToStage(nextStage);
 
-          // 插入阶段过渡消息
+          // 插入阶段过渡消息（系统消息）
           this.messages.push({
             id: uid(),
-            role: 'ai',
+            role: 'system',
             content: data.transitionMessage || `--- Moving to ${nextStage} phase ---`,
             createdAt: Date.now(),
             isSystem: true
           });
 
-          // 发送新阶段开场白
+          // 发送新阶段开场白（系统消息）
           const meta = getStageMeta(nextStage);
           this.messages.push({
             id: uid(),
-            role: 'ai',
+            role: 'system',
             content: STAGE_OPENINGS[nextStage],
             createdAt: Date.now(),
-            stageInfo: { stage: nextStage, label: meta?.label ?? '', labelZh: meta?.labelZh ?? '' }
+            isSystem: true
           });
         }
       } catch (e) {
@@ -592,10 +607,10 @@ export const useInterviewStore = defineStore('interview', {
 
           this.messages.push({
             id: uid(),
-            role: 'ai',
+            role: 'system',
             content: STAGE_OPENINGS[nextStage],
             createdAt: Date.now(),
-            stageInfo: { stage: nextStage, label: meta?.label ?? '', labelZh: meta?.labelZh ?? '' }
+            isSystem: true
           });
         } else {
           this.finishAndSummarize();
@@ -631,7 +646,7 @@ export const useInterviewStore = defineStore('interview', {
           type: 'TEXT',
           sender: this.sessionId || 'anonymous',
           receiver: '',
-          content: '请用中文对本次面试进行总结评价，包括表现好的方面和需要改进的地方。',
+          content: '请对本次面试进行总结评价，包括表现好的方面和需要改进的地方。',
           timestamp: Date.now(),
           metadata: { summary: true }
         });

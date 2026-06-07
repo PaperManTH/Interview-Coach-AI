@@ -1,5 +1,6 @@
 package com.interviewcoach.websocket;
 
+import com.interviewcoach.common.Constants;
 import com.interviewcoach.entity.dto.websocket.MessageDTO;
 import com.interviewcoach.entity.dto.websocket.MessageType;
 import com.interviewcoach.utils.MessageCodec;
@@ -153,6 +154,6 @@ public class WebSocketSessionManager {
 
     private String getUserId(Session session) {
         Object userIdAttr = session.getUserProperties().get(KEY_USER_ID);
-        return userIdAttr == null ? "anonymous" : userIdAttr.toString();
+        return userIdAttr == null ? Constants.DEFAULT_USER_ID : userIdAttr.toString();
     }
 }

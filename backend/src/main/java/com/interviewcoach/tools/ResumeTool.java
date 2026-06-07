@@ -1,9 +1,9 @@
-package com.interviewcoach.tool;
+package com.interviewcoach.tools;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.interviewcoach.entity.ResumeProfile;
 import com.interviewcoach.mapper.ResumeProfileMapper;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.model.function.FunctionCallback;
 import org.springframework.stereotype.Component;
@@ -17,15 +17,15 @@ import java.util.Map;
  */
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class ResumeTool implements FunctionCallback {
 
     private final ResumeProfileMapper resumeProfileMapper;
+
     private final ObjectMapper objectMapper;
 
-    public ResumeTool(ResumeProfileMapper resumeProfileMapper, ObjectMapper objectMapper) {
-        this.resumeProfileMapper = resumeProfileMapper;
-        this.objectMapper = objectMapper;
-    }
+    /** ThreadLocal 传递 userId */
+    private static final ThreadLocal<String> CURRENT_USER_ID = new ThreadLocal<>();
 
     @Override
     public String getName() {
@@ -35,7 +35,8 @@ public class ResumeTool implements FunctionCallback {
     @Override
     public String getDescription() {
         return "当用户在对话中透露个人信息、技能、项目经验、工作经历时，调用此工具更新简历数据库。" +
-               "参数: skills(技能列表), projects(项目经验列表), workExperience(工作经历列表), strengths(优势列表)";
+               "参数: candidateSummary(候选人概括), skills(技能列表), projects(项目经验列表), " +
+               "workExperience(工作经历列表), strengths(优势列表)";
     }
 
     @Override
@@ -58,10 +59,11 @@ public class ResumeTool implements FunctionCallback {
     @SuppressWarnings("unchecked")
     public String call(String input) {
         log.info("[Tool-Resume] 收到更新请求: {}", input);
-        // 这里需要 userId，但 FunctionCallback 的 call 没有 userId 上下文
-        // 通过 ThreadLocal 传递，见下方 setCurrentUserId
+
+        // 通过 ThreadLocal 获取 userId
         String userId = CURRENT_USER_ID.get();
         if (userId == null) {
+            log.warn("[Tool-Resume] 无法确定用户身份");
             return "{\"success\": false, \"message\": \"无法确定用户身份\"}";
         }
 
@@ -87,7 +89,7 @@ public class ResumeTool implements FunctionCallback {
             log.info("[Tool-Resume] 简历已更新 userId={}", userId);
             return "{\"success\": true, \"message\": \"简历信息已更新\"}";
         } catch (Exception e) {
-            log.error("[Tool-Resume] 更新失败: {}", e.getMessage());
+            log.error("[Tool-Resume] 更新失败: {}", e.getMessage(), e);
             return "{\"success\": false, \"message\": \"更新失败: " + e.getMessage() + "\"}";
         }
     }
@@ -132,13 +134,16 @@ public class ResumeTool implements FunctionCallback {
         return p;
     }
 
-    // ===== ThreadLocal 传递 userId =====
-    private static final ThreadLocal<String> CURRENT_USER_ID = new ThreadLocal<>();
-
+    /**
+     * 设置当前用户 ID（在调用 LLM 前设置）。
+     */
     public static void setCurrentUserId(String userId) {
         CURRENT_USER_ID.set(userId);
     }
 
+    /**
+     * 清除当前用户 ID（在调用 LLM 后清除）。
+     */
     public static void clearCurrentUserId() {
         CURRENT_USER_ID.remove();
     }

@@ -13,7 +13,6 @@ import org.springframework.web.context.support.WebApplicationContextUtils;
 
 /**
  * WebSocket Endpoint 配置器。
- * 通过 Spring ApplicationContext 获取 Bean，解决 JSR 356 Endpoint 无法使用依赖注入的问题。
  */
 @Slf4j
 public class WebSocketConfigurator extends ServerEndpointConfig.Configurator {

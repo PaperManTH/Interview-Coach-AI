@@ -37,6 +37,16 @@ public class BilingualResponse {
     }
 
     /**
+     * LLM 调用失败时的降级回复
+     */
+    public static BilingualResponse fallback() {
+        return new BilingualResponse(
+            "抱歉，AI 服务暂时不可用，请稍后重试。",
+            "Sorry, the AI service is temporarily unavailable. Please try again later."
+        );
+    }
+
+    /**
      * 获取格式化的双语文本（用于显示）
      */
     public String getFormattedText() {

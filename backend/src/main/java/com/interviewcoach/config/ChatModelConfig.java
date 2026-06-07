@@ -1,5 +1,7 @@
 package com.interviewcoach.config;
 
+import com.interviewcoach.common.Constants;
+import com.interviewcoach.common.InterviewConstants;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Configuration;
@@ -25,9 +27,9 @@ public class ChatModelConfig {
     @PostConstruct
     public void init() {
         loadPrompt("system", "system-default.txt");
-        loadPrompt("warmup", "stage-warmup.txt");
-        loadPrompt("technical", "stage-technical.txt");
-        loadPrompt("pressure", "stage-pressure.txt");
+        loadPrompt(InterviewConstants.STAGE_WARMUP, "stage-warmup.txt");
+        loadPrompt(InterviewConstants.STAGE_TECHNICAL, "stage-technical.txt");
+        loadPrompt(InterviewConstants.STAGE_PRESSURE, "stage-pressure.txt");
         log.info("[Config] 提示词加载完成");
     }
 
@@ -67,9 +69,9 @@ public class ChatModelConfig {
 
     public String getPromptByStage(String stage) {
         return switch (stage) {
-            case "warmup" -> getWarmupPrompt();
-            case "technical" -> getTechnicalPrompt();
-            case "pressure" -> getPressurePrompt();
+            case InterviewConstants.STAGE_WARMUP -> getWarmupPrompt();
+            case InterviewConstants.STAGE_TECHNICAL -> getTechnicalPrompt();
+            case InterviewConstants.STAGE_PRESSURE -> getPressurePrompt();
             default -> getSystemPrompt();
         };
     }
@@ -81,11 +83,11 @@ public class ChatModelConfig {
         
         return switch (provider.toLowerCase()) {
             case "deepseek" -> "https://api.deepseek.com";
-            case "qwen" -> "https://dashscope.aliyuncs.com/compatible-mode/v1";
+            case Constants.PROVIDER_QIANWEN -> "https://dashscope.aliyuncs.com/compatible-mode/v1";
             case "glm" -> "https://open.bigmodel.cn/api/paas/v4";
             case "kimi" -> "https://api.moonshot.cn/v1";
-            case "openai" -> "https://api.openai.com";
-            case "azure" -> "https://{your-resource}.openai.azure.com";
+            case Constants.PROVIDER_OPENAI -> "https://api.openai.com";
+            case Constants.PROVIDER_AZURE -> "https://{your-resource}.openai.azure.com";
             default -> "https://api.openai.com";
         };
     }

@@ -17,19 +17,26 @@ public class InterviewSession {
     private Long id;
 
     private String sessionId;
+
     private String userId;
+
     private String status;
+
     private String interviewType;
+
     private LocalDateTime startedAt;
+
     private LocalDateTime endedAt;
-    private LocalDateTime pausedAt; // 暂停时间（用户退出但未结束面试时记录）
-    
+
+    /** 暂停时间（用户退出但未结束面试时记录） */
+    private LocalDateTime pausedAt;
+
     /** 当前面试阶段（warmup / technical / pressure），用于恢复会话时定位进度 */
     private String currentStage;
-    
+
     /** 当前阶段内的轮次（0开始），用于恢复会话时定位进度 */
     private Integer stageRound;
-    
+
     /** 总轮次，用于进度展示 */
     private Integer totalRounds;
 

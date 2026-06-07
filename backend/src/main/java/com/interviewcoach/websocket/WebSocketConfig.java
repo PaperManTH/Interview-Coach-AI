@@ -9,8 +9,6 @@ import org.springframework.web.socket.server.standard.ServerEndpointExporter;
 
 /**
  * WebSocket 配置类。
- * <p>
- * 显式注册 JSR 356 WebSocket 端点。
  */
 @Slf4j
 @Configuration

@@ -1,4 +1,3 @@
-// 配置相关 API 调用
 export interface UserConfig {
   userId: string;
   asrType: string;
@@ -51,9 +50,7 @@ export async function saveUserConfig(userId: string, config: UserConfigRequest):
   try {
     const response = await fetch(`${BASE_URL}/api/user/config?userId=${userId}`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(config),
     });
     const data = await response.json();

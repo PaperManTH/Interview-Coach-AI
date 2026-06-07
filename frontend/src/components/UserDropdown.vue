@@ -93,7 +93,6 @@ onUnmounted(() => {
               <polyline points="12 6 12 12 16 14"/>
             </svg>
             <span>面试历史</span>
-            <span class="badge">新</span>
           </button>
 
           <button class="menu-item" @click="navigateTo('/settings')">
@@ -222,15 +221,6 @@ onUnmounted(() => {
 
 .menu-item svg {
   flex-shrink: 0;
-}
-
-.badge {
-  padding: 2px 6px;
-  background: rgba(16, 185, 129, 0.15);
-  border-radius: 4px;
-  font-size: 10px;
-  font-weight: 700;
-  color: #059669;
 }
 
 .menu-item.logout {

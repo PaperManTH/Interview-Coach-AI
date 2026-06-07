@@ -77,6 +77,21 @@ onBeforeUnmount(() => {
       <span v-else class="stop-mark">■</span>
     </button>
 
+    <!-- 重播按钮 -->
+    <button
+      v-if="store.hasAudio"
+      class="replay-btn"
+      @click="store.replayAudio()"
+      title="重播语音"
+      aria-label="replay audio"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+        <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+        <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+      </svg>
+    </button>
+
     <!-- 录音计时 -->
     <div v-if="store.status === 'listening'" class="recording-pill">
       <span class="rec-dot"></span>
@@ -193,6 +208,30 @@ onBeforeUnmount(() => {
   50%     { transform: scale(1.06); box-shadow: 0 6px 18px rgba(239,68,68,0.5); }
 }
 @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+/* ============ 重播按钮 ============ */
+.replay-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #6366f1;
+  transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  backdrop-filter: blur(4px);
+}
+.replay-btn:hover {
+  background: rgba(238, 242, 255, 0.8);
+  border-color: rgba(99, 102, 241, 0.4);
+  color: #4f46e5;
+  transform: translateY(-1px);
+}
+.replay-btn:active { transform: translateY(0); }
 
 /* ============ 录音计时 ============ */
 .recording-pill {

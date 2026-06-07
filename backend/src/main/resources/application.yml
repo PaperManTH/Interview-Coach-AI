@@ -67,28 +67,8 @@ app:
     proxy:
       host: 127.0.0.1
       port: 7890
-
-  # ---- LLM / TTS / ASR ----
-  # 所有 AI 服务配置由用户在个人设置中配置，从数据库读取
-  # 全局默认使用 Mock 模式（无用户配置时）
-  llm:
-    provider: mock
-  asr:
-    provider: mock
-  tts:
-    provider: mock
-
-  websocket:
-    endpoint: /ws/interview
-    heartbeat-seconds: 30
-    allowed-origins: ${CORS_ORIGINS:*}
-
-  prompt:
-    location: prompts
-
+      
   interview:
-    # 默认场景类型：hr / technical / pressure
-    default-type: ${INTERVIEW_TYPE:hr}
     # 对话记忆配置
     conversation:
       # 会话保留天数（已结束的会话在此天数后自动清理）

@@ -184,8 +184,8 @@ function startInterview() {
         </div>
       </section>
 
-      <!-- 简历上传 -->
-      <section class="resume-section">
+      <!-- 简历上传（需登录） -->
+      <section v-if="auth.isLoggedIn" class="resume-section">
         <div class="resume-card">
           <div class="resume-icon-wrap">
             <img :src="dataPng" class="resume-icon" alt="resume" />
@@ -216,7 +216,7 @@ function startInterview() {
         <p class="footer-zh">熟能生巧 · 继续练习，你离 offer 只差一步</p>
       </footer>
 
-      <ResumeUpload ref="resumeUpload" :hide-trigger="true" @uploaded="onResumeUploaded" />
+      <ResumeUpload v-if="auth.isLoggedIn" ref="resumeUpload" :hide-trigger="true" @uploaded="onResumeUploaded" />
     </div>
   </div>
 </template>

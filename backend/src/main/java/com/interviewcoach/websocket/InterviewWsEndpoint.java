@@ -1,5 +1,7 @@
 package com.interviewcoach.websocket;
 
+import com.interviewcoach.common.Constants;
+import com.interviewcoach.common.InterviewConstants;
 import com.interviewcoach.entity.InterviewSession;
 import com.interviewcoach.entity.dto.ai.BilingualResponse;
 import com.interviewcoach.entity.dto.websocket.MessageDTO;
@@ -35,9 +37,13 @@ import java.util.UUID;
 public class InterviewWsEndpoint {
 
     private WebSocketSessionManager sessionManager;
+
     private SpringAiService springAiService;
+
     private AsrService asrService;
+
     private TtsService ttsService;
+
     private ConversationService conversationService;
 
     public void setSessionManager(WebSocketSessionManager sessionManager) {
@@ -86,7 +92,7 @@ public class InterviewWsEndpoint {
                     dbSessionId = existingSession.getSessionId();
                     log.info("[WS] 复用用户活跃会话: dbSessionId={}, userId={}", dbSessionId, userId);
                 } else {
-                    InterviewSession dbSession = conversationService.createSession(userId, "dynamic");
+                    InterviewSession dbSession = conversationService.createSession(userId, Constants.INTERVIEW_TYPE_DYNAMIC);
                     dbSessionId = dbSession.getSessionId();
                     log.info("[WS] 数据库会话创建成功: dbSessionId={}, userId={}", dbSessionId, userId);
                 }
@@ -107,7 +113,7 @@ public class InterviewWsEndpoint {
             MessageDTO initMsg = MessageDTO.builder()
                     .id(UUID.randomUUID().toString())
                     .type(MessageType.SESSION_INIT)
-                    .sender("system")
+                    .sender(InterviewConstants.SENDER_SYSTEM)
                     .content(dbSessionId)
                     .metadata(meta)
                     .timestamp(System.currentTimeMillis())
@@ -204,7 +210,7 @@ public class InterviewWsEndpoint {
                     if (existingSession != null) {
                         dbSessionId = existingSession.getSessionId();
                     } else {
-                        InterviewSession dbSession = conversationService.createSession(userId, "dynamic");
+                        InterviewSession dbSession = conversationService.createSession(userId, Constants.INTERVIEW_TYPE_DYNAMIC);
                         dbSessionId = dbSession.getSessionId();
                     }
                     session.getUserProperties().put("dbSessionId", dbSessionId);
@@ -219,7 +225,7 @@ public class InterviewWsEndpoint {
         MessageDTO userMsg = MessageDTO.builder()
                 .id(UUID.randomUUID().toString())
                 .type(MessageType.TEXT)
-                .sender("user")  // 明确标记为用户消息
+                .sender(InterviewConstants.SENDER_USER)  // 明确标记为用户消息
                 .content(userMessage)
                 .timestamp(System.currentTimeMillis())
                 .sessionId(websocketSessionId)
@@ -228,10 +234,16 @@ public class InterviewWsEndpoint {
 
         // 1.5 持久化用户消息（使用数据库会话ID）
         log.info("[WS-Persistence] 保存用户消息: messageId={}, dbSessionId={}", userMsg.getId(), dbSessionId);
-        saveMessageToDatabase(dbSessionId, userId, userMsg.getId(), "user", "text", userMessage);
+        saveMessageToDatabase(dbSessionId, userId, userMsg.getId(), InterviewConstants.SENDER_USER, "text", userMessage);
 
         // 2. 生成 AI 双语回复（传递原始 msg 以提取动态模式 metadata）
-        BilingualResponse aiResponse = callAiServiceBilingual(userId, userMessage, msg);
+        BilingualResponse aiResponse;
+        try {
+            aiResponse = callAiServiceBilingual(userId, userMessage, msg, dbSessionId);
+        } catch (Exception e) {
+            log.error("[WS] AI 服务调用失败，使用降级回复: {}", e.getMessage());
+            aiResponse = BilingualResponse.fallback();
+        }
 
         // 3. 构建双语消息发送给前端
         Map<String, Object> bilingualContent = new HashMap<>();
@@ -239,7 +251,7 @@ public class InterviewWsEndpoint {
         bilingualContent.put("english", aiResponse.getEnglish());
         
         // 从消息 metadata 或 sessionId(JSON) 中提取当前阶段信息并保存
-        String currentStage = "warmup";
+        String currentStage = InterviewConstants.STAGE_WARMUP;
         // 1. 先尝试从 metadata 获取
         if (msg != null && msg.getMetadata() != null) {
             Object stageObj = msg.getMetadata().get("stage");
@@ -249,7 +261,7 @@ public class InterviewWsEndpoint {
             }
         }
         // 2. 再尝试从 sessionId 解析 JSON（兼容旧方式）
-        if ("warmup".equals(currentStage) && msg != null && msg.getSessionId() != null) {
+        if (InterviewConstants.STAGE_WARMUP.equals(currentStage) && msg != null && msg.getSessionId() != null) {
             try {
                 String sessionIdStr = msg.getSessionId();
                 if (sessionIdStr.startsWith("{") && sessionIdStr.contains("stage")) {
@@ -316,7 +328,7 @@ public class InterviewWsEndpoint {
         MessageDTO reply = MessageDTO.builder()
                 .id(UUID.randomUUID().toString())
                 .type(MessageType.TEXT)
-                .sender("assistant")
+                .sender(InterviewConstants.SENDER_ASSISTANT)
                 .receiver(msg.getSender())
                 .content(aiResponse.getFormattedText())  // 兼容旧客户端，显示双语文本
                 .timestamp(System.currentTimeMillis())
@@ -334,7 +346,7 @@ public class InterviewWsEndpoint {
             log.warn("[WS-Persistence] metadata 序列化失败: {}", e.getMessage());
         }
         log.info("[WS-Persistence] 保存 AI 回复: messageId={}, dbSessionId={}", reply.getId(), dbSessionId);
-        saveMessageToDatabase(dbSessionId, userId, reply.getId(), "assistant", "text", aiResponse.getFormattedText(), metadataJson);
+        saveMessageToDatabase(dbSessionId, userId, reply.getId(), InterviewConstants.SENDER_ASSISTANT, "text", aiResponse.getFormattedText(), metadataJson);
 
         // 4. TTS 语音合成（仅处理英文部分，过滤疑似降级/错误提示）
         String englishText = aiResponse.getEnglish();
@@ -391,7 +403,7 @@ public class InterviewWsEndpoint {
         sendMessage(session, MessageDTO.builder()
                 .id(UUID.randomUUID().toString())
                 .type(MessageType.TEXT)
-                .sender("system")
+                .sender(InterviewConstants.SENDER_SYSTEM)
                 .content("开始录音...")
                 .timestamp(System.currentTimeMillis())
                 .sessionId(session.getId())
@@ -468,7 +480,7 @@ public class InterviewWsEndpoint {
         MessageDTO voiceTextMsg = MessageDTO.builder()
                 .id(UUID.randomUUID().toString())
                 .type(MessageType.VOICE_TEXT)
-                .sender(msg.getSender() != null ? msg.getSender() : "user")
+                .sender(msg.getSender() != null ? msg.getSender() : InterviewConstants.SENDER_USER)
                 .content(voiceText != null ? voiceText : "语音识别失败")
                 .timestamp(System.currentTimeMillis())
                 .sessionId(session.getId())
@@ -485,7 +497,7 @@ public class InterviewWsEndpoint {
             MessageDTO errorMsg = MessageDTO.builder()
                     .id(UUID.randomUUID().toString())
                     .type(MessageType.TEXT)
-                    .sender("system")
+                    .sender(InterviewConstants.SENDER_SYSTEM)
                     .content("抱歉，语音识别失败，请重试或使用文字输入")
                     .timestamp(System.currentTimeMillis())
                     .sessionId(session.getId())
@@ -495,7 +507,14 @@ public class InterviewWsEndpoint {
         }
 
         // 2. 生成 AI 双语回复（传递原始 msg 以提取动态模式 metadata）
-        BilingualResponse aiResponse = callAiServiceBilingual(userId, voiceText, msg);
+        String voiceDbSessionId = (String) session.getUserProperties().get("dbSessionId");
+        BilingualResponse aiResponse;
+        try {
+            aiResponse = callAiServiceBilingual(userId, voiceText, msg, voiceDbSessionId);
+        } catch (Exception e) {
+            log.error("[WS] AI 服务调用失败，使用降级回复: {}", e.getMessage());
+            aiResponse = BilingualResponse.fallback();
+        }
 
         // 3. 构建双语消息发送给前端
         Map<String, Object> bilingualContent = new HashMap<>();
@@ -503,7 +522,7 @@ public class InterviewWsEndpoint {
         bilingualContent.put("english", aiResponse.getEnglish());
         
         // 从消息 metadata 或 sessionId(JSON) 中提取当前阶段信息并保存
-        String currentStage = "warmup";
+        String currentStage = InterviewConstants.STAGE_WARMUP;
         // 1. 先尝试从 metadata 获取
         if (msg != null && msg.getMetadata() != null) {
             Object stageObj = msg.getMetadata().get("stage");
@@ -513,7 +532,7 @@ public class InterviewWsEndpoint {
             }
         }
         // 2. 再尝试从 sessionId 解析 JSON（兼容旧方式）
-        if ("warmup".equals(currentStage) && msg != null && msg.getSessionId() != null) {
+        if (InterviewConstants.STAGE_WARMUP.equals(currentStage) && msg != null && msg.getSessionId() != null) {
             try {
                 String sessionIdStr = msg.getSessionId();
                 if (sessionIdStr.startsWith("{") && sessionIdStr.contains("stage")) {
@@ -566,7 +585,7 @@ public class InterviewWsEndpoint {
         MessageDTO reply = MessageDTO.builder()
                 .id(UUID.randomUUID().toString())
                 .type(MessageType.TEXT)
-                .sender("assistant")
+                .sender(InterviewConstants.SENDER_ASSISTANT)
                 .content(aiResponse.getFormattedText())  // 兼容旧客户端
                 .timestamp(System.currentTimeMillis())
                 .sessionId(session.getId())
@@ -606,9 +625,9 @@ public class InterviewWsEndpoint {
             // 检查是否为动态模式
             if (msg != null && msg.getMetadata() != null) {
                 Object modeObj = msg.getMetadata().get("mode");
-                if ("dynamic".equals(modeObj)) {
-                    String stage = String.valueOf(msg.getMetadata().getOrDefault("stage", "warmup"));
-                    String focus = String.valueOf(msg.getMetadata().getOrDefault("focus", "general"));
+                if (Constants.INTERVIEW_TYPE_DYNAMIC.equals(modeObj)) {
+                    String stage = String.valueOf(msg.getMetadata().getOrDefault("stage", InterviewConstants.STAGE_WARMUP));
+                    String focus = String.valueOf(msg.getMetadata().getOrDefault("focus", InterviewConstants.FOCUS_GENERAL));
                     log.info("[WS-Dynamic] 检测到动态模式, stage={}, focus={}", stage, focus);
                     return springAiService.chatDynamic(userId, message, stage, focus);
                 }
@@ -628,7 +647,7 @@ public class InterviewWsEndpoint {
      * @param msg 原始 MessageDTO（用于提取 metadata 中的阶段信息），可为 null
      * @return BilingualResponse 双语响应对象
      */
-    private BilingualResponse callAiServiceBilingual(String userId, String message, MessageDTO msg) {
+    private BilingualResponse callAiServiceBilingual(String userId, String message, MessageDTO msg, String dbSessionId) {
         if (springAiService == null) {
             log.warn("[WS] SpringAiService 未初始化，使用模拟回复");
             return new BilingualResponse("模拟回复：" + message, "Mock response: " + message);
@@ -637,15 +656,15 @@ public class InterviewWsEndpoint {
             // 检查是否为动态模式
             if (msg != null && msg.getMetadata() != null) {
                 Object modeObj = msg.getMetadata().get("mode");
-                if ("dynamic".equals(modeObj)) {
-                    String stage = String.valueOf(msg.getMetadata().getOrDefault("stage", "warmup"));
-                    String focus = String.valueOf(msg.getMetadata().getOrDefault("focus", "general"));
+                if (Constants.INTERVIEW_TYPE_DYNAMIC.equals(modeObj)) {
+                    String stage = String.valueOf(msg.getMetadata().getOrDefault("stage", InterviewConstants.STAGE_WARMUP));
+                    String focus = String.valueOf(msg.getMetadata().getOrDefault("focus", InterviewConstants.FOCUS_GENERAL));
                     log.info("[WS-Dynamic] 检测到动态模式, stage={}, focus={}", stage, focus);
-                    return springAiService.chatDynamicBilingual(userId, message, stage, focus);
+                    return springAiService.chatDynamicBilingual(userId, message, stage, focus, dbSessionId);
                 }
             }
             // 传统模式
-            return springAiService.chatBilingual(userId, message);
+            return springAiService.chatBilingual(userId, message, dbSessionId);
         } catch (Exception e) {
             log.error("[WS] AI 服务调用失败", e);
             return new BilingualResponse("抱歉，服务暂时不可用", "Sorry, service is temporarily unavailable");
@@ -664,7 +683,7 @@ public class InterviewWsEndpoint {
         sendMessage(session, MessageDTO.builder()
                 .id(UUID.randomUUID().toString())
                 .type(MessageType.ERROR)
-                .sender("system")
+                .sender(InterviewConstants.SENDER_SYSTEM)
                 .content(errorMessage)
                 .timestamp(System.currentTimeMillis())
                 .sessionId(session.getId())
@@ -675,7 +694,7 @@ public class InterviewWsEndpoint {
         sendMessage(session, MessageDTO.builder()
                 .id(UUID.randomUUID().toString())
                 .type(MessageType.TEXT)
-                .sender("system")
+                .sender(InterviewConstants.SENDER_SYSTEM)
                 .receiver(userId)
                 .content("连接成功！欢迎使用 Interview Coach")
                 .timestamp(System.currentTimeMillis())
@@ -696,7 +715,7 @@ public class InterviewWsEndpoint {
             sendMessage(session, MessageDTO.builder()
                     .id(UUID.randomUUID().toString())
                     .type(MessageType.STAGE_TRANSITION)
-                    .sender("system")
+                    .sender(InterviewConstants.SENDER_SYSTEM)
                     .content(payload)
                     .timestamp(System.currentTimeMillis())
                     .sessionId(session.getId())
@@ -709,7 +728,7 @@ public class InterviewWsEndpoint {
 
     private String getUserId(Session session) {
         Object uid = session.getUserProperties().get(WebSocketSessionManager.KEY_USER_ID);
-        return uid != null ? uid.toString() : "anonymous";
+        return uid != null ? uid.toString() : Constants.DEFAULT_USER_ID;
     }
 
     private String extractUserId(Session session, EndpointConfig config) {
@@ -721,7 +740,7 @@ public class InterviewWsEndpoint {
             Object userIdObj = config.getUserProperties().get(WebSocketSessionManager.KEY_USER_ID);
             if (userIdObj != null) return userIdObj.toString();
         }
-        return "anonymous";
+        return Constants.DEFAULT_USER_ID;
     }
 
     /**
@@ -735,7 +754,7 @@ public class InterviewWsEndpoint {
                 MessageDTO audioMsg = MessageDTO.builder()
                         .id(UUID.randomUUID().toString())
                         .type(MessageType.AUDIO)
-                        .sender("assistant")
+                        .sender(InterviewConstants.SENDER_ASSISTANT)
                         .content(audioBase64)
                         .timestamp(System.currentTimeMillis())
                         .sessionId(session.getId())
