@@ -8,6 +8,9 @@ import com.interviewcoach.service.SpringAiService;
 import com.interviewcoach.service.TtsService;
 import com.interviewcoach.utils.MessageCodec;
 
+import com.interviewcoach.entity.InterviewMessage;
+import com.interviewcoach.service.ConversationService;
+
 import jakarta.websocket.*;
 import jakarta.websocket.server.ServerEndpoint;
 import lombok.extern.slf4j.Slf4j;
@@ -34,6 +37,7 @@ public class InterviewWsEndpoint {
     private SpringAiService springAiService;
     private AsrService asrService;
     private TtsService ttsService;
+    private ConversationService conversationService;
 
     public void setSessionManager(WebSocketSessionManager sessionManager) {
         this.sessionManager = sessionManager;
@@ -49,6 +53,10 @@ public class InterviewWsEndpoint {
 
     public void setTtsService(TtsService ttsService) {
         this.ttsService = ttsService;
+    }
+
+    public void setConversationService(ConversationService conversationService) {
+        this.conversationService = conversationService;
     }
 
     @OnOpen
@@ -128,7 +136,8 @@ public class InterviewWsEndpoint {
     private void handleTextMessage(Session session, MessageDTO msg) {
         String userMessage = msg.getContent();
         String userId = getUserId(session);
-        log.info("[WS] 收到消息 sessionId={}, content={}", session.getId(), userMessage);
+        String websocketSessionId = session.getId();
+        log.info("[WS] 收到消息 sessionId={}, content={}", websocketSessionId, userMessage);
 
         // 1. 先将用户消息回传给前端（让用户看到自己发送的消息）
         MessageDTO userMsg = MessageDTO.builder()
@@ -137,9 +146,12 @@ public class InterviewWsEndpoint {
                 .sender("user")  // 明确标记为用户消息
                 .content(userMessage)
                 .timestamp(System.currentTimeMillis())
-                .sessionId(session.getId())
+                .sessionId(websocketSessionId)
                 .build();
         sendMessage(session, userMsg);
+
+        // 1.5 持久化用户消息
+        saveMessageToDatabase(websocketSessionId, userId, userMsg.getId(), "user", "text", userMessage);
 
         // 2. 生成 AI 双语回复（传递原始 msg 以提取动态模式 metadata）
         BilingualResponse aiResponse = callAiServiceBilingual(userId, userMessage, msg);
@@ -156,11 +168,20 @@ public class InterviewWsEndpoint {
                 .receiver(msg.getSender())
                 .content(aiResponse.getFormattedText())  // 兼容旧客户端，显示双语文本
                 .timestamp(System.currentTimeMillis())
-                .sessionId(session.getId())
+                .sessionId(websocketSessionId)
                 .metadata(bilingualContent)  // 新客户端可以使用结构化数据
                 .build();
         sendMessage(session, reply);
         sendMessage(session, MessageDTO.ack(msg.getId()));
+
+        // 3.5 持久化 AI 回复消息
+        String metadataJson = null;
+        try {
+            metadataJson = MessageCodec.toJson(bilingualContent);
+        } catch (Exception e) {
+            log.warn("[WS-Persistence] metadata 序列化失败: {}", e.getMessage());
+        }
+        saveMessageToDatabase(websocketSessionId, userId, reply.getId(), "assistant", "text", aiResponse.getFormattedText(), metadataJson);
 
         // 4. TTS 语音合成（仅处理英文部分，过滤疑似降级/错误提示）
         String englishText = aiResponse.getEnglish();
@@ -168,6 +189,39 @@ public class InterviewWsEndpoint {
             log.debug("[WS-TTS] 跳过语音合成（响应疑似降级/错误提示）");
         } else {
             synthesizeAndSend(session, userId, englishText);
+        }
+    }
+
+    /**
+     * 将消息持久化到数据库
+     */
+    private void saveMessageToDatabase(String sessionId, String userId, String messageId, 
+                                        String sender, String type, String content) {
+        saveMessageToDatabase(sessionId, userId, messageId, sender, type, content, null);
+    }
+
+    /**
+     * 将消息持久化到数据库（带 metadata）
+     */
+    private void saveMessageToDatabase(String sessionId, String userId, String messageId,
+                                        String sender, String type, String content, String metadata) {
+        if (conversationService == null) {
+            log.debug("[WS-Persistence] ConversationService 未初始化，跳过消息持久化");
+            return;
+        }
+        try {
+            InterviewMessage message = new InterviewMessage();
+            message.setSessionId(sessionId);
+            message.setMessageId(messageId);
+            message.setSender(sender);
+            message.setType(type);
+            message.setContent(content);
+            message.setTimestampMs(System.currentTimeMillis());
+            message.setMetadata(metadata);
+            conversationService.saveMessage(message);
+            log.debug("[WS-Persistence] 消息持久化成功: messageId={}, sender={}", messageId, sender);
+        } catch (Exception e) {
+            log.error("[WS-Persistence] 消息持久化失败: {}", e.getMessage());
         }
     }
 

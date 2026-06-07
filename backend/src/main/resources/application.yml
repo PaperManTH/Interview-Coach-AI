@@ -89,3 +89,9 @@ app:
   interview:
     # 默认场景类型：hr / technical / pressure
     default-type: ${INTERVIEW_TYPE:hr}
+    # 对话记忆配置
+    conversation:
+      # 会话保留天数（已结束的会话在此天数后自动清理）
+      retention-days: 30
+      # 定时清理任务的 cron 表达式
+      cleanup-cron: "0 0 3 * * ?"
