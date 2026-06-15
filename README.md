@@ -20,7 +20,7 @@
 
 Interview Coach AI 是一个基于人工智能的全栈面试训练平台，通过模拟真实面试场景，帮助用户提升面试技巧和表达能力。系统支持多种面试类型（技术面试、HR面试、压力面试），提供实时语音交互、智能问答和个性化反馈。
 
-演示视频(百度网盘):[https://pan.baidu.com/s/1to_oP7gKPB3icIaKWQrgvA?pwd=5dkv]
+演示视频(百度网盘):https://pan.baidu.com/s/1GYFr9A_X8wXWvYXoitaYJw?pwd=647e 
 
 ### ✨ 核心亮点
 
